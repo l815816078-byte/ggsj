@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FY 卡密管理系统 - 代理中心</title>
+<link rel="stylesheet" href="/theme.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">A</div><span class="name">FY 代理中心</span></div>
+    <nav class="menu" id="menu"></nav>
+    <div class="side-foot">
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"></button>
+      <div class="user">
+        <span class="uname" id="uname"></span>
+        <button class="logout-btn" onclick="logout()">退出</button>
+      </div>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="modal-mask" id="modalMask"><div class="modal" id="modalBox"></div></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/agent.js"></script>
+</body>
+</html>

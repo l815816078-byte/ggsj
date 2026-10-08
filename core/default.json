@@ -1,0 +1,13 @@
+{
+    "app_name": "fy",
+    "app_packages": {
+        "fy": "com.yxg.fy.guanwang"
+    },
+    "yolo": {
+        "param_path": "/data/local/tmp/assets/best3.param",
+        "bin_path": "/data/local/tmp/assets/best3.bin",
+        "labels": "E,H,4,M,8,C,W,G,Q,U,B,Y,X,R,2,F,T,J,3,S,7,N,D,5,6,P,V,K,L,A,9",
+        "version": "v5",
+        "cpu_thread_num": 3
+    }
+}

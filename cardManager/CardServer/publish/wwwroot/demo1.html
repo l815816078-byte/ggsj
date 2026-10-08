@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo 1 - 暗黑玻璃拟态</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0B0F1A; color: #E2E8F0;
+    min-height: 100vh;
+  }
+  .bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: radial-gradient(1200px 600px at 80% -10%, #312E81 0%, transparent 60%), radial-gradient(900px 500px at -10% 110%, #0E7490 0%, transparent 55%), #0B0F1A; }
+  .bg::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.04'%3E%3Cpath d='M0 60L60 0M60 60L0 0'/%3E%3C/g%3E%3C/svg%3E"); }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 230px; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
+    background: rgba(15, 23, 42, .6); backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255,255,255,.06);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 8px 12px 22px; }
+  .brand .logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg,#6366F1,#22D3EE); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(99,102,241,.45); font-weight: 800; color: #fff; font-size: 18px; }
+  .brand .name { font-weight: 700; font-size: 15px; letter-spacing: .5px; }
+  .menu-item { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 10px; color: #94A3B8; font-size: 14px; cursor: pointer; transition: all .18s; position: relative; }
+  .menu-item:hover { color: #E2E8F0; background: rgba(255,255,255,.05); }
+  .menu-item.active { color: #fff; background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(34,211,238,.15)); box-shadow: inset 0 0 0 1px rgba(129,140,248,.35); }
+  .menu-item.active::before { content: ''; position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; border-radius: 3px; background: linear-gradient(180deg,#6366F1,#22D3EE); }
+  .menu-item svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+  .main { flex: 1; padding: 26px 32px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+  .page-head h2 { font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+  .page-head .sub { color: #64748B; font-size: 13px; margin-top: 4px; }
+  .btn { padding: 9px 20px; border-radius: 10px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; background: linear-gradient(135deg,#6366F1,#8B5CF6); color: #fff; box-shadow: 0 6px 18px rgba(99,102,241,.4); transition: all .2s; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(99,102,241,.55); }
+  .glass { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; backdrop-filter: blur(18px); padding: 22px 24px; margin-bottom: 20px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  .card-title .dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg,#6366F1,#22D3EE); box-shadow: 0 0 12px rgba(99,102,241,.8); }
+  .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; align-items: end; }
+  .field label { display: block; font-size: 12px; color: #94A3B8; margin-bottom: 8px; letter-spacing: 1px; }
+  .input, .select { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(15,23,42,.6); color: #E2E8F0; font-size: 14px; outline: none; transition: all .2s; }
+  .input:focus, .select:focus { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.2); }
+  .chips { display: flex; gap: 8px; }
+  .chip { padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(15,23,42,.5); color: #94A3B8; cursor: pointer; font-size: 13px; transition: all .18s; }
+  .chip.active { background: linear-gradient(135deg,#6366F1,#8B5CF6); color: #fff; border-color: transparent; box-shadow: 0 4px 14px rgba(99,102,241,.4); }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  .toolbar .spacer { flex: 1; }
+  .table-wrap { overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; padding: 13px 16px; font-size: 12px; font-weight: 600; color: #64748B; letter-spacing: 1px; background: rgba(15,23,42,.5); border-bottom: 1px solid rgba(255,255,255,.07); }
+  tbody td { padding: 14px 16px; font-size: 13.5px; border-bottom: 1px solid rgba(255,255,255,.04); transition: background .15s; }
+  tbody tr:hover td { background: rgba(99,102,241,.08); }
+  tbody tr:last-child td { border-bottom: none; }
+  .mono { font-family: Consolas, Monaco, monospace; letter-spacing: .5px; color: #A5B4FC; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .badge.active { background: rgba(16,185,129,.12); color: #34D399; } .badge.active::before { background: #34D399; box-shadow: 0 0 8px #34D399; }
+  .badge.unused { background: rgba(148,163,184,.1); color: #94A3B8; } .badge.unused::before { background: #64748B; }
+  .badge.disabled { background: rgba(239,68,68,.12); color: #F87171; } .badge.disabled::before { background: #EF4444; box-shadow: 0 0 8px #EF4444; }
+  .badge.expired { background: rgba(245,158,11,.12); color: #FBBF24; } .badge.expired::before { background: #F59E0B; box-shadow: 0 0 8px #F59E0B; }
+  .op { padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #94A3B8; font-size: 12px; cursor: pointer; margin-right: 6px; transition: all .15s; }
+  .op:hover { color: #fff; border-color: #6366F1; background: rgba(99,102,241,.15); }
+  .op.danger:hover { color: #F87171; border-color: #EF4444; background: rgba(239,68,68,.12); }
+  .pager { display: flex; justify-content: flex-end; gap: 6px; margin-top: 16px; align-items: center; }
+  .pg { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 1px solid rgba(255,255,255,.1); background: rgba(15,23,42,.5); color: #94A3B8; cursor: pointer; }
+  .pg.on { background: linear-gradient(135deg,#6366F1,#8B5CF6); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(99,102,241,.4); }
+  .total { font-size: 12px; color: #64748B; margin-right: 10px; }
+  .empty { text-align: center; color: #64748B; font-size: 13px; padding: 30px 0; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">F</div><span class="name">FY 卡密管理</span></div>
+    <div class="menu-item active"><svg viewBox="0 0 24 24"><path d="M4 13h6V3H4v10zm0 8h6v-6H4v6zm8 0h6V11h-6v10zm0-18v6h6V3h-6z"/></svg>仪表盘</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>发卡</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>卡密列表</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>在线统计</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>操作日志</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>代理管理</div>
+  </aside>
+  <main class="main">
+    <div class="page-head"><div><h2>卡密列表</h2><div class="sub">搜索、筛选与卡密管理操作</div></div><button class="btn">+ 发卡</button></div>
+
+    <div class="glass">
+      <div class="card-title"><span class="dot"></span>生成参数</div>
+      <div class="form-grid">
+        <div class="field"><label>数 量</label><input class="input" value="10"></div>
+        <div class="field"><label>时 长</label><div class="chips"><span class="chip">30天</span><span class="chip active">60天</span><span class="chip">90天</span></div></div>
+        <div class="field"><label>窗口数</label><input class="input" value="3"></div>
+        <div class="field"><label>备 注</label><input class="input" placeholder="如：卖给老王"></div>
+      </div>
+    </div>
+
+    <div class="glass">
+      <div class="card-title"><span class="dot"></span>卡密列表</div>
+      <div class="toolbar">
+        <input class="input" placeholder="搜索卡号" style="width:220px">
+        <select class="select" style="width:140px"><option>全部状态</option><option>未使用</option><option>已激活</option></select>
+        <button class="btn" style="padding:9px 16px">查询</button>
+        <div class="spacer"></div><span class="total">共 128 张</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>卡号</th><th>状态</th><th>时长</th><th>窗口</th><th>到期时间</th><th>归属</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">FY-7K2M-9X4P-A1B8</td><td><span class="badge active">已激活</span></td><td>60</td><td>3 窗</td><td>2026-10-21 14:00</td><td>admin</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-3A9C-5Q2W-E7R1</td><td><span class="badge unused">未使用</span></td><td>30</td><td>8 窗</td><td>-</td><td>代理A</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-8D4F-6J8K-L2M3</td><td><span class="badge active">已激活</span></td><td>90</td><td>1 窗</td><td>2027-02-14 09:30</td><td>admin</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-5H7N-2V3B-T6Y9</td><td><span class="badge disabled">已禁用</span></td><td>60</td><td>3 窗</td><td>2026-08-01 00:00</td><td>代理B</td><td><button class="op">延期</button><button class="op">启用</button></td></tr>
+            <tr><td class="mono">FY-9Q1Z-4C6D-U8E2</td><td><span class="badge expired">已过期</span></td><td>7</td><td>3 窗</td><td>2026-07-30 18:20</td><td>代理A</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="total">共 128 张</span>
+        <span class="pg">‹</span><span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">›</span>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

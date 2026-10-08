@@ -1,0 +1,93 @@
+<!-- 删掉 --><!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <!--加载本地地址-->
+    <!--  <link rel="stylesheet" href="zijide/element-plus.css"/>-->
+    <!--  <script src="./zijide/vue3.5.12.js"></script>-->
+    <!--  <script src="./zijide/element-plus.js"></script>-->
+    <!--  <script src="./zijide/form-create-element-ui.js"></script>-->
+    <!--加载网络地址-->
+    <link rel="stylesheet" href="http://unpkg.com/element-plus/dist/index.css"/>
+    <script src="http://unpkg.com/vue@3"></script>
+    <script src="http://unpkg.com/element-plus"></script>
+    <script src="http://unpkg.com/@form-create/element-ui@3"></script>
+</head>
+<body>
+<div id="app">
+    <form-create :rule="rule" :option="options" v-model="formData" v-model:api="api" @submit="onSubmit"></form-create>
+</div>
+<script>
+    const App = {
+        data() {
+            return {
+                rule: [{"type":"input","field":"Foa7mfifjfxcabc","title":"输入框","info":"","$required":false,"props":{"placeholder":"哈哈"},"_fc_id":"id_Fdibmfifjfxcacc","name":"ref_F77smfifjfxcadc","display":true,"hidden":false,"_fc_drag_tag":"input"}],
+                options: {"form":{"inline":false,"hideRequiredAsterisk":false,"labelPosition":"right","size":"default","labelWidth":"125px"},"resetBtn":{"show":false,"innerText":"重置"},"submitBtn":{"show":true,"innerText":"提交"}},
+                formData: {},
+                api: null,
+            };
+        },
+        mounted(){
+            let formData=JSON.parse(localStorage.getItem("UI"))
+            let fields=this.api.fields();
+            for (let key in formData) {
+                if (!fields.includes(key)) {
+                    delete formData[key];
+                }
+            }
+            console.log(formData);
+            this.api.setValue(formData)
+        },
+        methods: {
+            onSubmit(formData) {
+                localStorage.clear()
+                localStorage.setItem('UI', JSON.stringify(formData))
+                let data = JSON.stringify(formData)
+                console.log(data);
+                try {this.Ascript_Android(data)} catch (e) {}
+                try {this.Ascript_IOS(data)} catch (e) {}
+                try {this.LR_高级版静态UI(data)} catch (e) {}
+                try {this.AutoGO(data)} catch (e) {}
+            },
+            Ascript_Android(data) {
+                console.log("发送数据到ascript Android",data)
+                airscript.save("UI", data)
+                airscript.call("close", true)
+            },
+            Ascript_IOS(data) {
+                console.log("发送数据到ascript IOS",data)
+                ascript.save("UI", data)
+                ascript.call("close", true)
+            },
+            LR_高级版静态UI(data){
+                console.log("发送数据到懒人高级版",data)
+                let savepath = "/sdcard/uiConfig.txt";
+                window.bridge.writeStringToFile(savepath,data);
+                window.bridge.sendToLua("提交")
+            },
+            AutoGO(data) {
+                console.log("发送数据到AutoGO",data)
+                fetch('/ui-callback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: data
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Success:', data);
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                    });
+            },
+        }
+    };
+    const app = Vue.createApp(App);
+    app.use(ElementPlus).use(formCreate);
+    app.mount("#app");
+</script>
+</body>
+</html>

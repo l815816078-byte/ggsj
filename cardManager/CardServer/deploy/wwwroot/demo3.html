@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo 3 - 暗色科技风</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #0D1117; color: #C9D1D9; min-height: 100vh; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; background: #010409; border-right: 1px solid #21262D; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 8px 12px 24px; }
+  .brand .logo { width: 36px; height: 36px; border-radius: 8px; background: #238636; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 16px; box-shadow: 0 0 18px rgba(46,160,67,.4); }
+  .brand .name { font-weight: 700; font-size: 14px; color: #E6EDF3; }
+  .menu-item { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 6px; color: #8B949E; font-size: 13.5px; cursor: pointer; transition: all .12s; border: 1px solid transparent; }
+  .menu-item:hover { color: #E6EDF3; background: #161B22; }
+  .menu-item.active { color: #58A6FF; background: #161B22; border-color: #30363D; font-weight: 600; }
+  .menu-item svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+  .main { flex: 1; padding: 28px 32px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+  .page-head h2 { font-size: 20px; font-weight: 700; color: #E6EDF3; }
+  .page-head .sub { color: #8B949E; font-size: 13px; margin-top: 5px; }
+  .btn { padding: 8px 18px; border-radius: 6px; border: 1px solid #30363D; background: #238636; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+  .btn:hover { background: #2EA043; border-color: #2EA043; }
+  .btn.ghost { background: transparent; color: #C9D1D9; border-color: #30363D; }
+  .btn.ghost:hover { color: #58A6FF; border-color: #58A6FF; background: rgba(88,166,255,.08); }
+  .card { background: #161B22; border: 1px solid #21262D; border-radius: 10px; padding: 20px 22px; margin-bottom: 20px; }
+  .card-title { font-size: 14px; font-weight: 600; color: #E6EDF3; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+  .card-title .bar { width: 3px; height: 16px; background: #238636; border-radius: 2px; }
+  .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: end; }
+  .field label { display: block; font-size: 12px; color: #8B949E; margin-bottom: 7px; }
+  .input, .select { width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid #30363D; background: #0D1117; color: #E6EDF3; font-size: 13.5px; outline: none; transition: border-color .15s; }
+  .input:focus, .select:focus { border-color: #58A6FF; box-shadow: 0 0 0 3px rgba(88,166,255,.15); }
+  .chips { display: flex; gap: 8px; }
+  .chip { padding: 8px 14px; border-radius: 6px; border: 1px solid #30363D; background: #0D1117; color: #8B949E; cursor: pointer; font-size: 12.5px; transition: all .12s; }
+  .chip.active { background: #238636; color: #fff; border-color: #238636; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  .toolbar .spacer { flex: 1; }
+  .table-wrap { overflow: hidden; border: 1px solid #21262D; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 600; color: #8B949E; letter-spacing: .8px; background: #0D1117; border-bottom: 1px solid #21262D; text-transform: uppercase; }
+  tbody td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #161B22; }
+  tbody tr:hover td { background: #1C2128; }
+  tbody tr:last-child td { border-bottom: none; }
+  .mono { font-family: Consolas, Monaco, monospace; color: #79C0FF; font-size: 12.5px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .badge.active { background: rgba(46,160,67,.15); color: #3FB950; border: 1px solid rgba(46,160,67,.4); }
+  .badge.unused { background: rgba(139,148,158,.1); color: #8B949E; border: 1px solid #30363D; }
+  .badge.disabled { background: rgba(248,81,73,.12); color: #F85149; border: 1px solid rgba(248,81,73,.4); }
+  .badge.expired { background: rgba(210,153,34,.12); color: #D29922; border: 1px solid rgba(210,153,34,.4); }
+  .op { padding: 4px 10px; border-radius: 4px; border: 1px solid #30363D; background: transparent; color: #8B949E; font-size: 12px; cursor: pointer; margin-right: 5px; transition: all .12s; }
+  .op:hover { color: #58A6FF; border-color: #58A6FF; }
+  .op.danger:hover { color: #F85149; border-color: #F85149; }
+  .pager { display: flex; justify-content: flex-end; gap: 4px; margin-top: 16px; align-items: center; }
+  .pg { min-width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; border: 1px solid #30363D; background: #0D1117; color: #8B949E; cursor: pointer; padding: 0 5px; transition: all .12s; }
+  .pg:hover { border-color: #58A6FF; color: #58A6FF; }
+  .pg.on { background: #238636; color: #fff; border-color: #238636; }
+  .total { font-size: 12px; color: #8B949E; margin-right: 8px; }
+  .stat-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat { flex: 1; background: #161B22; border: 1px solid #21262D; border-radius: 8px; padding: 14px 16px; }
+  .stat .num { font-size: 22px; font-weight: 700; color: #E6EDF3; font-family: Consolas, monospace; }
+  .stat .lab { font-size: 12px; color: #8B949E; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">F</div><span class="name">FY CONSOLE</span></div>
+    <div class="menu-item active"><svg viewBox="0 0 24 24"><path d="M4 13h6V3H4v10zm0 8h6v-6H4v6zm8 0h6V11h-6v10zm0-18v6h6V3h-6z"/></svg>仪表盘</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>发卡</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>卡密列表</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>在线统计</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>操作日志</div>
+    <div class="menu-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>代理管理</div>
+  </aside>
+  <main class="main">
+    <div class="page-head"><div><h2>卡密列表</h2><div class="sub">LICENSE KEY MANAGEMENT</div></div><button class="btn">+ 发卡</button></div>
+
+    <div class="stat-bar">
+      <div class="stat"><div class="num">128</div><div class="lab">总卡密</div></div>
+      <div class="stat"><div class="num">86</div><div class="lab">已激活</div></div>
+      <div class="stat"><div class="num">31</div><div class="lab">未使用</div></div>
+      <div class="stat"><div class="num">11</div><div class="lab">已禁用</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="bar"></span>生成参数</div>
+      <div class="form-grid">
+        <div class="field"><label>数量</label><input class="input" value="10"></div>
+        <div class="field"><label>时长</label><div class="chips"><span class="chip">30天</span><span class="chip active">60天</span><span class="chip">90天</span></div></div>
+        <div class="field"><label>窗口数</label><input class="input" value="3"></div>
+        <div class="field"><label>备注</label><input class="input" placeholder="如：卖给老王"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="bar"></span>卡密列表</div>
+      <div class="toolbar">
+        <input class="input" placeholder="搜索卡号" style="width:220px">
+        <select class="select" style="width:140px"><option>全部状态</option><option>未使用</option><option>已激活</option></select>
+        <button class="btn ghost">查询</button>
+        <div class="spacer"></div><span class="total">共 128 张</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>卡号</th><th>状态</th><th>时长</th><th>窗口</th><th>到期时间</th><th>归属</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">FY-7K2M-9X4P-A1B8</td><td><span class="badge active">已激活</span></td><td>60</td><td>3 窗</td><td>2026-10-21 14:00</td><td>admin</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-3A9C-5Q2W-E7R1</td><td><span class="badge unused">未使用</span></td><td>30</td><td>8 窗</td><td>-</td><td>代理A</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-8D4F-6J8K-L2M3</td><td><span class="badge active">已激活</span></td><td>90</td><td>1 窗</td><td>2027-02-14 09:30</td><td>admin</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+            <tr><td class="mono">FY-5H7N-2V3B-T6Y9</td><td><span class="badge disabled">已禁用</span></td><td>60</td><td>3 窗</td><td>2026-08-01 00:00</td><td>代理B</td><td><button class="op">延期</button><button class="op">启用</button></td></tr>
+            <tr><td class="mono">FY-9Q1Z-4C6D-U8E2</td><td><span class="badge expired">已过期</span></td><td>7</td><td>3 窗</td><td>2026-07-30 18:20</td><td>代理A</td><td><button class="op">延期</button><button class="op danger">禁用</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="total">共 128 张</span>
+        <span class="pg">‹</span><span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">›</span>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

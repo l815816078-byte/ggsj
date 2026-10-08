@@ -1,0 +1,13 @@
+{
+  "_说明": "全局配置文件",
+  "app_name": "ggsj",
+  "version": "1.1.0",
+  "update_url": "http://111.231.167.150:8080/",
+  "license_server": "http://111.231.167.150:8080/",
+  "license_pubkey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5JxJ1JxqL/Jsh0tRXM+c\nzI+W9xzCEp0KWisGD94yp2CI0LjBKGTn305NpSu8SV3ywndnYZ/WG4V3d9Byh/9o\nDtAS+7bKREcNkiKCZnbeFO3LeCSN+ztbZFAkUBdqY792Y31dbM1x+1Q+NvwsCHDr\n1/DIgrTmeLFFCC7P5YQCaXgPmMUUYX44EX6c8ge+QAmRnOrGfItga3MbRbOaaa20\nksfFY/c3VAJIZWswDO+bnOlMN6GT0RUvvriORX9/tDthSCksSJw7p1FLGpuixUIt\nWBwV3T/cruCQPS4cfj9VDCGPR7iUsMk+UU7192cys9hkM9Cc7kS4ZQ+q8Iq39VWN\nZQIDAQAB\n-----END PUBLIC KEY-----",
+  "app_packages": {
+    "name": "com.standegg.wulin",
+    "kit": "fun.kitsunebi.kitsunebi4android"
+  },
+  "backend_url": "192.168.0.201:5000"
+}
