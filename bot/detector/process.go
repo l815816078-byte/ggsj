@@ -18,7 +18,7 @@ type ProcessDetector struct {
 }
 
 // NewProcessDetector 创建进程检测器
-func NewProcessDetector(interval time.Duration) *ProcessDetector {
+func NewProcessDetector(enabled bool, interval time.Duration) *ProcessDetector {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}
@@ -27,7 +27,7 @@ func NewProcessDetector(interval time.Duration) *ProcessDetector {
 		// 游戏包名统一从 app_packages.name 读取（default.json 配置）
 		gamePackage: core.Config.GetString("app_packages.name"),
 		kitPackage:  core.Config.GetString("app_packages.kit"),
-		enabled:     true,
+		enabled:     enabled,
 	}
 }
 

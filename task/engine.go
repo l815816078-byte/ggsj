@@ -65,6 +65,7 @@ type ExecResult struct {
 	LastStep      string
 	ExecutedSteps int
 	Error         error
+	RetryNode     bool // 弹窗清掉后要求调用方重试当前节点
 }
 
 // Execute 执行管道（MAA 式: next-list 驱动）
@@ -165,8 +166,10 @@ func (e *PipelineEngine) sweepOnce(exclude map[string]bool) string {
 			r = core.Exec(p.RecogRef) // 区域留空 → 用 recogs.json 预设的区域
 		}
 		if !r.Found {
+			core.LogWithTimef("[Engine] 弹窗清扫: 场景【%s】引用=%s → 未命中", p.Name, p.RecogRef)
 			continue
 		}
+		core.LogWithTimef("[Engine] 弹窗清扫: 场景【%s】引用=%s → 命中 (%d,%d)", p.Name, p.RecogRef, r.X, r.Y)
 		e.doAction(p, r.X, r.Y) // 复用引擎动作，点击/滑动都支持
 		if p.WaitAfter > 0 && p.Action != ActionSleep {
 			core.RandomSleep(p.WaitAfter/2, p.WaitAfter)
@@ -282,6 +285,10 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 				return &ExecResult{LastStep: step.Name}
 			}
 			if jumpIdx, ok := e.stepIdx[nextName]; ok {
+				// 插件步骤同样应用"等待秒"（与识别类步骤一致）：跳转前先停
+				if step.WaitAfter > 0 {
+					core.RandomSleep(step.WaitAfter/2, step.WaitAfter)
+				}
 				return e.runNode(jumpIdx, rs, deadline, ctx, "插件成功跳转")
 			}
 			return &ExecResult{Error: fmt.Errorf("[%s] 插件跳转【%s】未找到", step.Name, nextName), LastStep: step.Name}
@@ -295,6 +302,9 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 			nr.LastStep = step.Name
 			if nr.Success || nr.Error != nil {
 				return nr
+			}
+			if nr.RetryNode { // 弹窗清掉 → 重试当前节点
+				continue
 			}
 			// 无成功跳转命中 → 跳过视为完成，继续下一顺序节点
 			return &ExecResult{LastStep: step.Name}
@@ -310,6 +320,16 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 		}
 
 		if !matched {
+			// 识别失败 → 先扫一遍弹窗（识别不到通常是弹窗挡路），清掉就重试当前节点
+			core.LogWithTimef("[Engine] %s →【%s】未识别到 → 扫弹窗", e.config.Name, step.Name)
+			if e.checkPopups(rs, deadline, ctx) != nil {
+				if plugin.IsStopped() || time.Now().After(deadline) {
+					return &ExecResult{}
+				}
+				core.LogWithTimef("[Engine] %s →【%s】弹窗已清 → 重试当前节点", e.config.Name, step.Name)
+				continue // 弹窗清掉 → 重试当前节点识别
+			}
+			core.LogWithTimef("[Engine] %s →【%s】无弹窗可清", e.config.Name, step.Name)
 			// 未命中滑动重试：没找到就转圈滑动一次再找，本轮最多滑 RetrySwipe 次
 			// 滑动模仿找光柱转圈（alignLightPillar）：以滑动范围中心为基准，水平左右各100px，时长800ms
 			if e.swipeRetry(step, &swipeCount) {
@@ -348,6 +368,9 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 		if nr.Success || nr.Error != nil {
 			return nr
 		}
+		if nr.RetryNode { // 弹窗清掉 → 重试当前节点
+			continue
+		}
 		// next 列表无命中 → 继续当前步骤的 retry 循环
 		continue
 	}
@@ -360,15 +383,8 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 // 返回 nil error + !success → 无命中，调用方继续 retry
 // parentName 仅用于巡检日志显示（如 StartUp），标明子节点属于哪个父节点
 func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.Time, ctx *plugin.Context, parentName string) *ExecResult {
-	// ── 先扫弹窗（全局 + 任务级） ──
-	// 弹窗点掉后继续往下走 next：弹窗只是插队，处理完接着执行当前步骤的跳转，不丢弃整条链。
-	// 连锁弹窗由本循环逐个点掉；异常情况（常驻元素误配等点不完）靠 IsStopped/deadline 兜底退出
-	for e.checkPopups(rs, deadline, ctx) != nil {
-		if plugin.IsStopped() || time.Now().After(deadline) {
-			return &ExecResult{}
-		}
-	}
-
+	// 注意：弹窗不再在此处插队扫描。改为"识别失败时兜底"——
+	// runNode 未命中、或本函数子节点未命中时，才扫一次弹窗（见对应分支）。
 	if len(next) == 0 {
 		return &ExecResult{} // 空列表 → 回到父循环
 	}
@@ -413,6 +429,10 @@ func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.
 			}
 			if jumpIdx, ok := e.stepIdx[nextName]; ok {
 				core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| ok | 跳转:【%s】", e.config.Name, parentName, child.Name, nextName)
+				// 插件子节点同样应用"等待秒"（与识别类子节点一致）：跳转前先停
+				if child.WaitAfter > 0 {
+					core.RandomSleep(child.WaitAfter/2, child.WaitAfter)
+				}
 				return e.runNode(jumpIdx, rs, deadline, ctx, "子节点插件成功跳转")
 			}
 			core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| ok | 跳转:【%s】未找到", e.config.Name, parentName, child.Name, nextName)
@@ -435,7 +455,7 @@ func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.
 		}
 
 		if cMatched {
-			core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| 命中 | 点击后跟随", e.config.Name, parentName, child.Name)
+			core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| 命中 | %s", e.config.Name, parentName, child.Name, actionDesc(child))
 			e.doAction(child, cx, cy)
 			if child.WaitAfter > 0 && child.Action != ActionSleep {
 				core.RandomSleep(child.WaitAfter/2, child.WaitAfter)
@@ -447,9 +467,22 @@ func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.
 			if childResult.Success || childResult.Error != nil {
 				return childResult
 			}
+			if childResult.RetryNode { // 弹窗清掉 → 向上传递，让父节点重试
+				return childResult
+			}
 			// child 完成但未 #done → 继续尝试 next 列表中后续项
 			continue
 		}
+		// 子节点未命中 → 先扫一遍弹窗（可能是弹窗挡路导致识别不到），清掉就让父节点重巡检
+		core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】未识别到 → 扫弹窗", e.config.Name, parentName, child.Name)
+		if e.checkPopups(rs, deadline, ctx) != nil {
+			if plugin.IsStopped() || time.Now().After(deadline) {
+				return &ExecResult{}
+			}
+			core.LogWithTimef("[Engine] %s 弹窗已清 → 父节点重巡检", e.config.Name)
+			return &ExecResult{RetryNode: true}
+		}
+		core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】无弹窗可清", e.config.Name, parentName, child.Name)
 		// 未命中：配了未命中滑动次数 → 转圈滑动重试后重新识别
 		if child.RetrySwipe > 0 {
 			swipeCount := 0
@@ -460,7 +493,7 @@ func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.
 				}
 			}
 			if cMatched {
-				core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| 滑动后命中 | 点击后跟随", e.config.Name, parentName, child.Name)
+				core.LogWithTimef("[Engine] %s 巡检【%s】→【%s】| 滑动后命中 | %s", e.config.Name, parentName, child.Name, actionDesc(child))
 				e.doAction(child, cx, cy)
 				if child.WaitAfter > 0 && child.Action != ActionSleep {
 					core.RandomSleep(child.WaitAfter/2, child.WaitAfter)
@@ -468,6 +501,9 @@ func (e *PipelineEngine) processNext(next NextList, rs *RunState, deadline time.
 				rs.ExecutedCounts[child.Name]++
 				childResult := e.processNext(child.Next, rs, deadline, ctx, child.Name)
 				if childResult.Success || childResult.Error != nil {
+					return childResult
+				}
+				if childResult.RetryNode { // 弹窗清掉 → 向上传递
 					return childResult
 				}
 				continue
@@ -517,6 +553,8 @@ func (e *PipelineEngine) swipeRetry(step *StepConfig, swipeCount *int) bool {
 // 提示话只在屏幕上停留约 2 秒，必须先于全局识别弹窗执行；否则会被全局全屏 OCR
 // 弹窗挡在后面，等扫到时话已消失 → 死循环点任务。此改动只调整扫描顺序，不改任何弹窗逻辑。
 func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plugin.Context) *ExecResult {
+	core.LogWithTimef("[Engine] %s 开始扫弹窗（共 %d 项）", e.config.Name, len(e.popups))
+
 	// 第一遍：插件模式弹窗（时效性提示优先处理）
 	for i := range e.popups {
 		if plugin.IsStopped() {
@@ -528,19 +566,20 @@ func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plug
 		}
 		plug := plugin.Get(p.Name)
 		if plug == nil {
+			core.LogWithTimef("[Engine] %s 弹窗插件未注册: %s", e.config.Name, p.Name)
 			continue
 		}
 		// 同步 StepName，弹窗插件日志显示正确步骤名
 		ctx.StepName = p.Name
 		next, err := plug.Exec(ctx)
 		if err != nil {
-			// core.LogWithTimef("[Engine] %s 弹窗插件 %s 报错: %v", e.config.Name, p.Name, err)
+			core.LogWithTimef("[Engine] %s 弹窗插件 %s 报错: %v", e.config.Name, p.Name, err)
 			continue
 		}
 		if next == "" || next == "no" {
 			continue // 未命中，尝试下一个弹窗
 		}
-		// core.LogWithTimef("[Engine] %s 弹窗命中(插件): %s", e.config.Name, p.Name)
+		core.LogWithTimef("[Engine] %s 弹窗命中(插件): %s → %s", e.config.Name, p.Name, next)
 		rs.ExecutedCounts[p.Name]++
 		return &ExecResult{} // 回到父循环
 	}
@@ -568,10 +607,10 @@ func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plug
 		}
 
 		if pMatched {
-			// core.LogWithTimef("[Engine] %s 弹窗匹配: %s (引用:%s)", e.config.Name, p.Name, p.RecogRef)
+			core.LogWithTimef("[Engine] %s 弹窗匹配: %s (引用:%s) 跳过引用:%v", e.config.Name, p.Name, p.RecogRef, p.SkipRecogRefs)
 			// 排除条件：命中任一"跳过识别引用"（如剧情中）→ 跳过本弹窗不点
 			if e.matchSkipRecogRefs(p) {
-				// core.LogWithTimef("[Engine] %s 弹窗被排除跳过: %s", e.config.Name, p.Name)
+				core.LogWithTimef("[Engine] %s 弹窗被排除跳过: %s", e.config.Name, p.Name)
 				continue
 			}
 			// core.LogWithTimef("[Engine] %s 弹窗命中: %s", e.config.Name, p.Name)
@@ -592,11 +631,10 @@ func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plug
 func (e *PipelineEngine) matchSkipRecogRefs(step *StepConfig) bool {
 	for _, ref := range step.SkipRecogRefs {
 		r := core.Exec(ref)
+		core.LogWithTimef("[Engine] %s 节点 %s 跳过引用检查: %s → Found=%v(%d,%d)", e.config.Name, step.Name, ref, r.Found, r.X, r.Y)
 		if r.Found {
-			// core.LogWithTimef("[Engine] %s 节点 %s 命中排除:%s(%d,%d) → 跳过", e.config.Name, step.Name, ref, r.X, r.Y)
 			return true
 		}
-		// core.LogWithTimef("[Engine] %s 节点 %s 排除:%s → 未命中", e.config.Name, step.Name, ref)
 	}
 	return false
 }
@@ -627,6 +665,23 @@ func (e *PipelineEngine) execPluginStep(step *StepConfig, ctx *plugin.Context) s
 }
 
 // ---- 动作执行 ----
+// actionDesc 命中日志里的动作描述：未配动作的纯检测/路由节点不再误报成"点击"
+func actionDesc(step *StepConfig) string {
+	if step.Plugin {
+		return "插件执行后跟随"
+	}
+	switch step.Action {
+	case ActionClick:
+		return "点击后跟随"
+	case ActionSwipe:
+		return "滑动后跟随"
+	case ActionSleep:
+		return "等待后跟随"
+	default: // ActionNone
+		return "仅检测,不点击,直接跟随"
+	}
+}
+
 func (e *PipelineEngine) doAction(step *StepConfig, x, y int) {
 	// 空动作（纯路由节点如 StartUp）不打日志，避免与进入日志重复
 	if step.Action != "" {
@@ -685,17 +740,21 @@ func (e *PipelineEngine) doAction(step *StepConfig, x, y int) {
 		if duration <= 0 {
 			duration = 300
 		}
+		// 绝对起终点: [x,y] 写法优先，其次旧的四字段写法
+		sx, sy, ex, ey := step.SwipeX1, step.SwipeY1, step.SwipeX2, step.SwipeY2
+		if step.SwipeStart != [2]int{} || step.SwipeEnd != [2]int{} {
+			sx, sy = step.SwipeStart[0], step.SwipeStart[1]
+			ex, ey = step.SwipeEnd[0], step.SwipeEnd[1]
+		}
 		// 滑动偏移模式: 基于识别位置 + 偏移计算起终点
 		if x > 0 && y > 0 && step.SwipeDelta[0] != 0 || step.SwipeDelta[1] != 0 {
-			sx := x + step.ClickOffset[0]
-			sy := y + step.ClickOffset[1]
-			ex := sx + step.SwipeDelta[0]
-			ey := sy + step.SwipeDelta[1]
+			sx = x + step.ClickOffset[0]
+			sy = y + step.ClickOffset[1]
+			ex = sx + step.SwipeDelta[0]
+			ey = sy + step.SwipeDelta[1]
 			core.LogWithTimef("[Engine] 滑动偏移 (%d,%d)→(%d,%d)", sx, sy, ex, ey)
-			core.RandomSwipe2(sx, sy, ex, ey, duration, 5)
-		} else {
-			core.RandomSwipe2(step.SwipeX1, step.SwipeY1, step.SwipeX2, step.SwipeY2, duration, 5)
 		}
+		core.RandomSwipe2(sx, sy, ex, ey, duration, 5)
 	default:
 		core.LogWithTimef("[Engine] %s →【%s】未知动作类型: %s", e.config.Name, step.Name, step.Action)
 	}

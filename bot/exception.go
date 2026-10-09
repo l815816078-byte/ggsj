@@ -54,15 +54,21 @@ func (em *ExceptionManager) Start() {
 	em.detMgr = detector.NewManager(em.onExceptionDetected)
 
 	// 注册检测器（弹窗不再走全局异常，改为流水线内嵌处理）
-	em.detMgr.Register(detector.NewProcessDetector(time.Duration(cfg.Process.IntervalSec) * time.Second))
+	// 每个检测器都按 JSON 的"启用"字段决定是否真正参与调度
+	em.detMgr.Register(detector.NewProcessDetector(
+		cfg.Process.Enabled,
+		time.Duration(cfg.Process.IntervalSec)*time.Second,
+	))
 	em.detMgr.Register(detector.NewIdleDetector(
+		cfg.Idle.Enabled,
 		time.Duration(cfg.Idle.IntervalSec)*time.Second,
 		time.Duration(cfg.Idle.ThresholdSec)*time.Second,
 	))
 	em.detMgr.Register(detector.NewFreezeDetector(&cfg.Freeze))
 
 	em.detMgr.Start()
-	core.LogWithTimef("[Exception] 异常检测已启动 (%d 个检测器)", 3)
+	core.LogWithTimef("[Exception] 异常检测已启动 (进程=%v 空闲=%v 冻结=%v)",
+		cfg.Process.Enabled, cfg.Idle.Enabled, cfg.Freeze.Enabled)
 }
 
 // Stop 停止异常检测

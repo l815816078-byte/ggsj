@@ -94,10 +94,12 @@ type StepConfig struct {
 	ClickOffset   [2]int `json:"点击偏移"`  // 相对识别位置的位移 [dx, dy]
 	ClickTimes    int    `json:"连点次数"`  // 点击次数（连点），默认1次
 	ClickInterval int    `json:"连点间隔秒"` // 连点间隔，秒（默认0.5）
-	SwipeX1       int    `json:"滑动起点X"` // 滑动起点 X
-	SwipeY1       int    `json:"滑动起点Y"` // 滑动起点 Y
-	SwipeX2       int    `json:"滑动终点X"` // 滑动终点 X
-	SwipeY2       int    `json:"滑动终点Y"` // 滑动终点 Y
+	SwipeStart    [2]int `json:"滑动起点"`  // 绝对滑动起点 [x, y]
+	SwipeEnd      [2]int `json:"滑动终点"`  // 绝对滑动终点 [x, y]
+	SwipeX1       int    `json:"滑动起点X"` // 滑动起点 X（旧字段，兼容保留）
+	SwipeY1       int    `json:"滑动起点Y"` // 滑动起点 Y（旧字段，兼容保留）
+	SwipeX2       int    `json:"滑动终点X"` // 滑动终点 X（旧字段，兼容保留）
+	SwipeY2       int    `json:"滑动终点Y"` // 滑动终点 Y（旧字段，兼容保留）
 	SwipeDelta    [2]int `json:"滑动偏移"`  // 相对 OCR 位置的滑动偏移量 [dx, dy]
 	SwipeDuration int    `json:"滑动时长"`  // 滑动持续时间
 	RetrySwipe      int    `json:"未命中滑动次数"` // 未识别到时转圈滑动一次再找，最多找该次数

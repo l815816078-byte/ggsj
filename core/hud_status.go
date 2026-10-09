@@ -39,7 +39,9 @@ func init() {
 // 否则按竖屏坐标定位的 HUD 会显示在屏幕外/错位。
 // 获取分辨率失败时默认按竖屏处理（保持原行为）。
 func screenLandscape() bool {
+	LogWithTimef("[TRACE] HUD-1 进入 device.GetDisplayInfo(0)")
 	w, h, _, _ := device.GetDisplayInfo(0)
+	LogWithTimef("[TRACE] HUD-2 device.GetDisplayInfo 返回 w=%d h=%d", w, h)
 	if w > 0 && h > 0 {
 		return w > h
 	}

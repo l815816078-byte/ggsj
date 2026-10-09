@@ -67,6 +67,10 @@ func (rc *RecoveryContext) restartKit() bool {
 
 // FullRestart L3: kill代理+游戏→启动代理→启动游戏→登录
 func (rc *RecoveryContext) FullRestart() bool {
+	// 临时停用：真机 system.GetPid 触发 Illegal instruction，先跳过全量重启
+	core.LogWithTimef("[Recovery] 全量重启已临时停用 → 直接返回")
+	return false
+
 	core.LogWithTimef("[Recovery] ===== L3 全量重启 =====")
 
 	// 1. 杀掉游戏进程(代理由 restartKit 内部先杀再启)
@@ -106,6 +110,10 @@ func appRunning(pkg string) bool {
 //	② 游戏没在跑 → 启动游戏(等 10~15 秒); 已经在跑 → 只 Launch 切回前台(等 3~5 秒), 不重启
 //	③ 走 登录.json 登录
 func (rc *RecoveryContext) StartupLogin() bool {
+	// 临时停用：真机 system.GetPid 触发 Illegal instruction，先跳过整个启动登录/起kit流程
+	core.LogWithTimef("[Recovery] 启动登录已临时停用 → 直接返回")
+	return false
+
 	// ① 代理: 游戏和 kit 都在跑 → 不杀(直接复用); 否则走 restartKit(杀 → 启动 → 点开关)
 	if appRunning(rc.gamePackage) && appRunning(rc.kitPackage) {
 		core.LogWithTimef("[Recovery] 游戏与代理均已在运行 → 不杀代理, 直接复用")

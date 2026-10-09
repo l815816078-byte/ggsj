@@ -175,8 +175,8 @@ func (b *Bot) Run() {
 	// 启动异常检测 + 恢复
 	b.exception.Start()
 
-	// 启动时先登录
-	b.doStartupLogin()
+	// 启动时先登录（临时注释：真机 system.GetPid 触发 Illegal instruction，先跳过启动登录/起kit流程排查）
+	// b.doStartupLogin()
 
 	// 启动调度
 	b.scheduler.Start()

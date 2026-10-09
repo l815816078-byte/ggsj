@@ -1,8 +1,8 @@
 #APP包名
-appPackage="com.auto.go"
+appPackage="com.lwt.go"
 
 #APP名称
-appName="潜龙"
+appName="鬼怪世界"
 
 #APP打开后是否自动运行脚本
 autoRun=false

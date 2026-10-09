@@ -18,7 +18,7 @@ type IdleDetector struct {
 }
 
 // NewIdleDetector 创建空闲检测器
-func NewIdleDetector(interval, threshold time.Duration) *IdleDetector {
+func NewIdleDetector(enabled bool, interval, threshold time.Duration) *IdleDetector {
 	if interval <= 0 {
 		interval = 60 * time.Second
 	}
@@ -28,7 +28,7 @@ func NewIdleDetector(interval, threshold time.Duration) *IdleDetector {
 	d := &IdleDetector{
 		interval:      interval,
 		idleThreshold: threshold,
-		enabled:       true,
+		enabled:       enabled,
 	}
 	d.lastExecutionTime.Store(time.Now())
 	d.lastTaskName.Store("")
