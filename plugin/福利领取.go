@@ -1,0 +1,78 @@
+package plugin
+
+import (
+	"time"
+
+	"app/core"
+)
+
+func init() {
+	Register(&福利领取{})
+}
+
+// 福利领取 插件
+//
+// 循环，结束条件：外层红点和内层红点都扫不到 → 结束；另有 60 秒超时兜底：
+//
+//	for {                                              // 60 秒超时兜底
+//	    外层红点(317,116,356,647) + 内层红点(363,134,1160,591)
+//	    两者都为空 → 结束
+//	    否则：外层红点逐个点 → 内层红点逐个点 → 回到开头重扫
+//	}
+//
+// 预设："红点" 走字库找字 + "寻找个数": 10，
+// 靠 core.ExecAll 返回区域内全部红点（core/recog.go:417 的多结果分支）。
+type 福利领取 struct{}
+
+func (p *福利领取) Name() string { return "福利领取" }
+
+func (p *福利领取) Exec(ctx *Context) (string, error) {
+	if IsStopped() {
+		return "no", nil
+	}
+
+	core.LogWithTimef("[福利领取] 已进入福利面板 → 开始领红点")
+
+	// 外层大循环，60 秒超时兜底
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) {
+		if IsStopped() {
+			return "no", nil
+		}
+
+		// 外层点
+		外层点 := core.ExecAll("红点", 317, 116, 356, 647)
+
+		// 外层扫不到红点 → 福利结束
+		if len(外层点) == 0 {
+			core.LogWithTimef("[福利领取] 外层无红点 → 结束")
+			break
+		}
+
+		for _, op := range 外层点 {
+			if IsStopped() || time.Now().After(deadline) {
+				break
+			}
+			core.LogWithTimef("[福利领取] 外层红点(%d,%d) → 点击", op.X, op.Y)
+			core.RandomClickInAreaWithDelay(op.X, op.Y, op.X+3, op.Y+3)
+
+			// 内层：点开这一项后扫内层红点，逐个点
+			内层点 := core.ExecAll("红点", 363, 134, 1160, 591)
+			// 内层扫不到红点 → 只跳过本项，继续下一个外层红点
+			if len(内层点) == 0 {
+				core.LogWithTimef("[福利领取] 内层无红点 → 跳过本项")
+				continue
+			}
+			for _, ip := range 内层点 {
+				if IsStopped() || time.Now().After(deadline) {
+					break
+				}
+				core.LogWithTimef("[福利领取] 内层红点(%d,%d) → 点击", ip.X, ip.Y)
+				core.RandomClickInAreaWithDelay(ip.X, ip.Y, ip.X+3, ip.Y+3)
+			}
+		}
+	}
+
+	core.LogWithTimef("[福利领取] 处理完成")
+	return "ok", nil
+}
