@@ -86,11 +86,10 @@ func (p *野外挂机) Exec(ctx *Context) (string, error) {
 					if IsStopped() {
 						break
 					}
-					if rt := core.Exec("立即传送"); rt.Found {
-						core.LogWithTimef("[野外挂机] 检测到【立即传送】(%d,%d) → 点击并刷新超时", rt.X, rt.Y)
-						core.RandomClickInAreaWithDelay(rt.X, rt.Y, rt.X+3, rt.Y+3)
-						deadline = time.Now().Add(15 * time.Second)
-						continue
+					if ClickRecog("立即传送") {
+						// 立即传送成功 → 查找点击打开【咒术传送】，然后断开循环
+						ClickRecog("咒术传送")
+						break
 					}
 					core.RandomSleep(500, 1000)
 				}
