@@ -35,7 +35,7 @@ func (p *复活) Exec(ctx *Context) (string, error) {
 	core.LogWithTimef("[复活] 点击复活，累计复活次数 %d/%d", n, 复活重置阈值)
 
 	if int(n) >= 复活重置阈值 {
-		core.RandomSleep(5000, 6000) //复活需要回城时间
+		core.RandomSleep(3000, 3000)
 		// 给【主线任务】压 3000 秒强制冷却
 		core.ExtendCooldown("主线任务", time.Now().Add(3000*time.Second))
 		core.LogWithTimef("[复活] 复活次数已达 %d 次 → 【主线任务】冷却 3000 秒，并立即执行【野外挂机】清零复活计数", 复活重置阈值)

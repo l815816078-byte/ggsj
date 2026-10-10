@@ -68,7 +68,33 @@ func (p *福利领取) Exec(ctx *Context) (string, error) {
 					break
 				}
 				core.LogWithTimef("[福利领取] 内层红点(%d,%d) → 点击", ip.X, ip.Y)
-				core.RandomClickInAreaWithDelay(ip.X, ip.Y, ip.X+3, ip.Y+3)
+				core.RandomClickInAreaWithDelay(ip.X, ip.Y, ip.X+3, ip.Y+3, 3000)
+			}
+
+			// 内层红点点击完之后：翻页共 6 次（前 3 次从下往上，后 3 次从上往下），每次翻完重扫红点点掉
+			for i := 1; i <= 6; i++ {
+				if IsStopped() || time.Now().After(deadline) {
+					break
+				}
+				if !core.Exec("是否翻页").Found {
+					break
+				}
+				if i <= 3 {
+					core.LogWithTimef("[福利领取] 从下往上翻页 %d/3", i)
+					core.SwipeStraight(594, 557, 594, 357, 1500)
+				} else {
+					core.LogWithTimef("[福利领取] 从上往下翻页 %d/3", i-3)
+					core.SwipeStraight(594, 357, 594, 557, 1000)
+				}
+
+				翻页红点 := core.ExecAll("红点", 373, 311, 950, 641)
+				for _, p := range 翻页红点 {
+					if IsStopped() || time.Now().After(deadline) {
+						break
+					}
+					core.LogWithTimef("[福利领取] 翻页后红点(%d,%d) → 点击", p.X, p.Y)
+					core.RandomClickInAreaWithDelay(p.X, p.Y, p.X+3, p.Y+3, 3000)
+				}
 			}
 		}
 	}
