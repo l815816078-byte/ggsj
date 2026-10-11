@@ -138,9 +138,9 @@ func (p *自动买药) Exec(ctx *Context) (string, error) {
 	return "ok", nil
 }
 
-// 买药 到达地点后：循环找【药店npc】(超时30秒/间隔2秒) → 点击 → 点【药水】→ 全部 → 确认 → 购买 → 退出
+// 买药 到达地点后：循环找【药店npc】(超时30秒/间隔1-2秒) → 点击 → 点【药水】→ 全部 → 确认 → 购买 → 退出
 func 买药() {
-	// 1) 循环找药店npc（超时 30 秒，间隔 2 秒）
+	// 1) 循环找药店npc（超时 30 秒，间隔 1-2 秒）
 	deadline := time.Now().Add(30 * time.Second)
 	找到 := false
 	for time.Now().Before(deadline) {
@@ -149,10 +149,10 @@ func 买药() {
 		}
 		if ClickRecog("药店npc", 238, 53, 960, 627) {
 			找到 = true
-			core.RandomSleep(6000, 8000)
+			core.RandomSleep(3000, 6000)
 			break
 		}
-		core.RandomSleep(2000, 2000)
+		core.RandomSleep(1000, 2000)
 	}
 	if !找到 {
 		core.LogWithTimef("[买药] 30秒内未找到药店npc → 结束")
