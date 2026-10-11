@@ -752,9 +752,13 @@ func (e *PipelineEngine) doAction(step *StepConfig, x, y int) {
 			sy = y + step.ClickOffset[1]
 			ex = sx + step.SwipeDelta[0]
 			ey = sy + step.SwipeDelta[1]
-			core.LogWithTimef("[Engine] 滑动偏移 (%d,%d)→(%d,%d)", sx, sy, ex, ey)
+			core.LogWithTimef("[Engine] %s →【%s】滑动偏移: 识别(%d,%d) + 点击偏移(%d,%d) = 起点(%d,%d)，滑动偏移(%d,%d) = 终点(%d,%d)",
+				e.config.Name, step.Name, x, y, step.ClickOffset[0], step.ClickOffset[1], sx, sy, step.SwipeDelta[0], step.SwipeDelta[1], ex, ey)
 		}
+		core.LogWithTimef("[Engine] %s →【%s】滑动执行: 识别坐标(%d,%d) 本次生效起终点 (%d,%d)→(%d,%d) 时长=%dms 配置[起点=%v 终点=%v 偏移=%v 时长=%d]",
+			e.config.Name, step.Name, x, y, sx, sy, ex, ey, duration, step.SwipeStart, step.SwipeEnd, step.SwipeDelta, step.SwipeDuration)
 		core.RandomSwipe2(sx, sy, ex, ey, duration, 5)
+		core.LogWithTimef("[Engine] %s →【%s】滑动完成 (%d,%d)→(%d,%d) 耗时=%dms", e.config.Name, step.Name, sx, sy, ex, ey, duration)
 	default:
 		core.LogWithTimef("[Engine] %s →【%s】未知动作类型: %s", e.config.Name, step.Name, step.Action)
 	}

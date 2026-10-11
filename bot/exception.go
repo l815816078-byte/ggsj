@@ -176,7 +176,10 @@ func convertPopupScenesToSteps(cfg *detector.PopupConfig) []task.StepConfig {
 			Direction:   s.Direction,
 			ClickArea:   s.ClickArea,
 			ClickOffset: s.ClickOffset,
+			SwipeStart:  s.SwipeStart,
+			SwipeEnd:    s.SwipeEnd,
 			SwipeDelta:  s.SwipeDelta,
+			SwipeDuration: s.SwipeDur,
 			WaitAfter:   s.WaitAfter * 1000, // 秒 → 毫秒（引擎直接用毫秒）
 		}
 

@@ -211,6 +211,8 @@ func RandomSwipe2(x1, y1, x2, y2, duration, randomOffset int) {
 		offset3 = -offset3
 	}
 	// 使用 Swipe 直线滑动（起终点直线插值，避免贝塞尔曲线的弧度导致滑动不直、游戏不识别）
+	LogWithTimef("[Swipe] 直线滑动 基础(%d,%d)→(%d,%d) X随机偏移(%d,%d) 实际(%d,%d)→(%d,%d) 时长=%dms",
+		x1, y1, x2, y2, offset1, offset3, x1+offset1, y1, x2+offset3, y2, duration)
 	motion.Swipe(x1+offset1, y1, x2+offset3, y2, duration, 0, 0)
 }
 

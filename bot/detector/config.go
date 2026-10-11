@@ -46,7 +46,10 @@ type PopupScene struct {
 	WaitAfter   int    `json:"等待秒"`  // 点击后等待，秒；0=不等（引擎用毫秒，转换时乘1000）
 	Plugin     bool   `json:"插件模式"` // 插件模式：走插件处理，忽略识别/动作字段；名称即插件注册名（如"弹窗_判断等级复活"）
 	Action     string `json:"动作"`   // 点击(默认) / 滑动。空=点击，旧配置不写即沿用点击
+	SwipeStart [2]int `json:"滑动起点"` // 绝对滑动起点 [x,y]（动作=滑动 时使用）
+	SwipeEnd   [2]int `json:"滑动终点"` // 绝对滑动终点 [x,y]（动作=滑动 时使用）
 	SwipeDelta [2]int `json:"滑动偏移"` // 相对识别位置的滑动偏移量 [dx,dy]（动作=滑动 时使用）
+	SwipeDur   int    `json:"滑动时长"` // 滑动持续时间（毫秒）
 }
 
 // PopupSceneList 场景列表，兼容字符串数组和对象数组两种 JSON 格式
