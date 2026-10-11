@@ -36,15 +36,16 @@ func (p *复活) Exec(ctx *Context) (string, error) {
 
 	if int(n) >= 复活重置阈值 {
 		core.RandomSleep(3000, 3000)
-		// 给【主线任务】压 3000 秒强制冷却
-		core.ExtendCooldown("主线任务", time.Now().Add(3000*time.Second))
-		core.LogWithTimef("[复活] 复活次数已达 %d 次 → 【主线任务】冷却 3000 秒，并立即执行【野外挂机】清零复活计数", 复活重置阈值)
-		/*	// 先清冷却（否则 RunTask 内部的 CanRun 会因冷却拒绝执行），再同步立即执行
-			ResetTaskCooldown("野外挂机")
-			if !RunTask("野外挂机") {
-				core.LogWithTimef("[复活] 立即执行【野外挂机】失败（检查 assets/tasks/*.json 是否有\"野外挂机\"）")
-			}*/
-		复活次数.Store(0) // 计数清零，重新累计
+		// 死前 5 分钟内在打 BOSS → 给"上次打 BOSS 的那个任务"压 3000 秒冷却
+		if time.Since(上次打BOSS时间) < 5*time.Minute {
+			core.ExtendCooldown(上次打BOSS任务名, time.Now().Add(3000*time.Second))
+			core.LogWithTimef("[复活] 上次打BOSS任务=【%s】(%.0f秒前) → 【%s】冷却 3000 秒",
+				上次打BOSS任务名, time.Since(上次打BOSS时间).Seconds(), 上次打BOSS任务名)
+			复活次数.Store(0) // 压了冷却才清零计数，重新累计
+		} else {
+			core.LogWithTimef("[复活] 上次打BOSS任务=【%s】(%.0f秒前) → 超过5分钟，不压冷却",
+				上次打BOSS任务名, time.Since(上次打BOSS时间).Seconds())
+		}
 	}
 	return "ok", nil
 }

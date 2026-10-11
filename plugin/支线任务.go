@@ -20,8 +20,8 @@ func (p *支线任务) Name() string { return "支线任务" }
 func (p *支线任务) Exec(ctx *Context) (string, error) {
 	ClickRecog("支线任务")
 	ClickAdaptive(2000, 1000, nil,
-		btn("接受"),
-		btn("确认"),
+		btn("接受", 3),
+		btn("确认", 3),
 		btn("立即传送", 3),
 		btn("咒术传送", 3),
 		btn("引导提示"),

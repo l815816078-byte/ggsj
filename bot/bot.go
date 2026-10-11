@@ -121,6 +121,12 @@ func (b *Bot) Init() error {
 	plugin.SetRunTaskFunc(b.scheduler.RunTaskNow)
 	// 注入"插件内清除指定任务冷却"的实现（plugin 不能 import task，只能反向注入）
 	plugin.SetResetTaskCooldownFunc(b.scheduler.ResetTaskCooldown)
+	// 注入"插件内清一次任务轮转弹窗"的实现（plugin 不能 import task，只能反向注入）
+	// 临时建一个空引擎，ClearAllPopups 只用全局 taskRotatePopups + 动作执行，不依赖引擎配置
+	plugin.SetClearPopupsFunc(func() int {
+		engine := task.NewPipelineEngine(task.TaskConfig{Name: "弹窗清扫"})
+		return engine.ClearAllPopups(0)
+	})
 	// 注入"插件内触发全量重启"的实现（如"连线失败"弹窗 → 重启 kit+游戏）
 	plugin.SetFullRestartFunc(b.exception.TriggerFullRestart)
 

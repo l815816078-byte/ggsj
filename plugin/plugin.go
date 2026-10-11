@@ -181,6 +181,36 @@ func ResetTaskCooldown(taskName string) bool {
 	return fn(taskName)
 }
 
+// ---------- 任务轮转弹窗清扫（依赖反转）----------
+//
+// 插件想主动做一次"任务轮转弹窗清扫"（detectors.json「任务轮转」段那种，扫到没有弹窗为止）时
+// 调用 ClearPopups()。与 RunTask 同理：task 包导入了 plugin，插件不能反向 import task，
+// 由外层(bot)初始化时注入实现。返回本次处理掉的弹窗次数。
+
+var (
+	clearPopupsMu sync.RWMutex
+	clearPopupsFn func() int
+)
+
+// SetClearPopupsFunc 注入"清一次任务轮转弹窗"的实现（由 bot 在 Init 时调用）
+func SetClearPopupsFunc(fn func() int) {
+	clearPopupsMu.Lock()
+	clearPopupsFn = fn
+	clearPopupsMu.Unlock()
+}
+
+// ClearPopups 主动做一次任务轮转弹窗清扫（扫到没有弹窗命中为止），返回处理次数。
+// 未注入实现（如单元测试/未走 bot 启动流程）时返回 0，不会 panic。
+func ClearPopups() int {
+	clearPopupsMu.RLock()
+	fn := clearPopupsFn
+	clearPopupsMu.RUnlock()
+	if fn == nil {
+		return 0
+	}
+	return fn()
+}
+
 // ---------- 触发全量重启（依赖反转）----------
 //
 // 与 RunTask 同理：全量重启（kill 代理+游戏 → 启动代理 → 启动游戏 → 登录）在 bot 里，

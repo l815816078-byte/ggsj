@@ -80,20 +80,32 @@ type BOSS技能 struct {
 	触发血量 int // 0 = 一直检测；非 0 = 只有当前血量等于它才检测（如 3 = 只剩 3 血时才检测）
 }
 
-// 危险技能默认 通用危险技能颜色范围（所有 BOSS 都要用）
+// 危险技能默认 兜底技能：只在"没读到该 BOSS 的专属配置"（BOSS 名空 / 危险技能按BOSS 里没配）时才用。
+// 可配多个，会组合到一起检测。
 var 危险技能默认 = []BOSS技能{
 	{技能名: "默认", 下限: []int{253, 112, 125}, 上限: []int{255, 217, 190}},
 }
 
-// 危险技能按BOSS 按 BOSS 名单独配的技能颜色范围（键 = BOSS 名 = recogs 预设名）
+// 危险技能按BOSS 按 BOSS 名单独配的技能颜色范围（键 = BOSS 名 = recogs 预设名）。
+// 配了就只用这里的技能（默认不参与）；一个 BOSS 可配多个技能，会组合到一起检测。
 var 危险技能按BOSS = map[string][]BOSS技能{
 	"自书鬼": {
+		{技能名: "常规", 下限: []int{253, 112, 125}, 上限: []int{255, 217, 190}},
 		{技能名: "黑雾", 下限: []int{19, 11, 48}, 上限: []int{32, 21, 78}, 触发血量: 3},
+	},
+	"主线59万狐狸": {
+		{技能名: "常规", 下限: []int{181, 143, 110}, 上限: []int{254, 202, 166}},
 	},
 }
 
 // BOSS名单 可按 BOSS 名覆盖"危险技能按BOSS"的 BOSS（识别预设名 = BOSS 名）
-var BOSS名单 = []string{"自书鬼"}
+var BOSS名单 = []string{"自书鬼", "主线59万狐狸"}
+
+// 上次打 BOSS 记录：哪个任务在打 BOSS + 时间（复活插件据此判断"是不是主线打 BOSS 时死的"）
+var (
+	上次打BOSS任务名 string
+	上次打BOSS时间   time.Time
+)
 
 func (p *躲避技能) Exec(ctx *Context) (string, error) {
 	// BOSS 检测 10 秒一次（不用每轮都检）
@@ -111,6 +123,10 @@ func (p *躲避技能) Exec(ctx *Context) (string, error) {
 				core.LogWithTimef("[躲避技能] 未检测到 BOSS → 结束")
 				return "ok", nil
 			}
+			// 检测到 BOSS → 记录"哪个任务在打 BOSS + 时间"（复活插件用它判断是不是主线打 BOSS）
+			上次打BOSS任务名 = ctx.TaskName
+			上次打BOSS时间 = time.Now()
+
 			// 检测到 BOSS 后检测血量"3"（剩 3 条血）：检测到一次就固化，不再重复检测
 			if !剩3血 {
 				剩3血 = core.Exec("3", 782, 96, 790, 107).Found
@@ -258,13 +274,23 @@ func 方向夹角(ax, ay, bx, by float64) float64 {
 //   - 再叠加当前 BOSS 的专属技能（危险技能按BOSS[BOSS名]）
 //   - 两者合并成一张危险图
 func 危险颜色范围(BOSS名 string, 当前血量 int) []BOSS技能 {
-	范围 := append([]BOSS技能{}, 危险技能默认...)
-	if BOSS名 != "" {
-		for _, sk := range 危险技能按BOSS[BOSS名] {
-			// 触发血量：0 = 一直检测；非 0 = 只有当前血量等于它才检测
+	按BOSS := 危险技能按BOSS[BOSS名]
+	// 没读到该 BOSS 的专属配置（BOSS 名空 / 没配）→ 用"危险技能默认"兜底
+	if BOSS名 == "" || len(按BOSS) == 0 {
+		var 范围 []BOSS技能
+		for _, sk := range 危险技能默认 {
 			if sk.触发血量 == 0 || sk.触发血量 == 当前血量 {
 				范围 = append(范围, sk)
 			}
+		}
+		return 范围
+	}
+	// 读到了专属配置 → 只用按 BOSS 配的技能（默认不参与）；多个技能组合在一起
+	var 范围 []BOSS技能
+	for _, sk := range 按BOSS {
+		// 触发血量：0 = 一直检测；非 0 = 只有当前血量等于它才检测
+		if sk.触发血量 == 0 || sk.触发血量 == 当前血量 {
+			范围 = append(范围, sk)
 		}
 	}
 	return 范围

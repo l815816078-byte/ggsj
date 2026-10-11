@@ -9,6 +9,7 @@ import (
 
 func init() {
 	Register(&野外挂机{})
+	Register(&挂机中{})
 }
 
 // 挂机点 一个挂机点：名称（recogs/字库预设名）+ 战力门槛
@@ -38,7 +39,7 @@ var (
 const (
 	找点滑动时长 = 2000
 	// 最多滑动次数
-	找点最多滑动 = 8
+	找点最多滑动 = 6
 )
 
 // 野外挂机 插件：选一个最符合当前战力的挂机点 → 循环查找并点击（地图界面由前置步骤打开）。
@@ -106,7 +107,7 @@ func (p *野外挂机) Exec(ctx *Context) (string, error) {
 		core.LogWithTimef("[野外挂机] 检测到【收藏】→ 滑动 %d,%d → %d,%d",
 			找点滑动起点[0], 找点滑动起点[1], 找点滑动终点[0], 找点滑动终点[1])
 		core.SwipeStraight(找点滑动起点[0], 找点滑动起点[1], 找点滑动终点[0], 找点滑动终点[1], 找点滑动时长)
-		core.RandomSleep(800, 1000)
+		core.RandomSleep(1500, 2000)
 	}
 
 	core.LogWithTimef("[野外挂机] 未找到【%s】→ 失败", target.名称)
@@ -160,4 +161,36 @@ func 最低门槛挂机点() 挂机点 {
 		}
 	}
 	return 候选[rand.Intn(len(候选))]
+}
+
+// 挂机中 插件：检测到"自动攻击开启中"即认为正在挂机中。
+// 挂机中顺带跑子任务（按顺序，冷却 1000 秒避免每轮重复执行）；
+// 命中返回 "ok"（挂机中），没检测到返回 "no"。
+type 挂机中 struct{}
+
+func (p *挂机中) Name() string { return "挂机中" }
+
+func (p *挂机中) Exec(ctx *Context) (string, error) {
+	if !core.Exec("自动攻击开启中").Found {
+		return "no", nil
+	}
+	core.LogWithTimef("[挂机中] 检测到自动攻击开启中 → 正在挂机")
+
+	RunTask("领取邮件", 3000)
+	core.RandomSleep(1000, 3000)
+	RunTask("领取成就", 3000)
+	core.RandomSleep(1000, 3000)
+	RunTask("福利领取", 3000)
+	core.RandomSleep(1000, 3000)
+	RunTask("灵力修炼", 300)
+	core.RandomSleep(1000, 3000)
+	RunTask("气运显现", 3000)
+	core.RandomSleep(1000, 3000)
+	RunTask("背包物品", 1000)
+	core.RandomSleep(1000, 3000)
+
+	// 背包物品之后，主动做一次任务轮转弹窗清扫
+	ClearPopups()
+
+	return "ok", nil
 }
