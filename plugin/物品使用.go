@@ -108,6 +108,10 @@ func (p *物品使用) Exec(ctx *Context) (string, error) {
 func (p *物品使用) 处理格子弹窗() bool {
 	点中过 := false
 	ClickAdaptive(2000, 1000, func(name string) {
+		// 结束按钮（关闭/点击关闭）只是收尾，不代表该格子有物品，不算"点中过"
+		if name == "关闭" || name == "盒子列表" || name == "全部" {
+			return
+		}
 		点中过 = true
 	},
 		btn("使用"),

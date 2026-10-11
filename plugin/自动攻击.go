@@ -22,7 +22,7 @@ type 自动攻击 struct{}
 func (p *自动攻击) Name() string { return "自动攻击" }
 
 func (p *自动攻击) Exec(ctx *Context) (string, error) {
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if IsStopped() {
 			return "no", nil
@@ -32,7 +32,7 @@ func (p *自动攻击) Exec(ctx *Context) (string, error) {
 			return "ok", nil
 		}
 		if time.Now().After(deadline) {
-			core.LogWithTimef("[自动攻击] 3 秒内未开启自动攻击 → 失败")
+			core.LogWithTimef("[自动攻击] 10 秒内未开启自动攻击 → 失败")
 			return "no", nil
 		}
 		core.LogWithTimef("[自动攻击] 未开启 → 点击自动攻击")

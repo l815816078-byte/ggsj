@@ -89,10 +89,10 @@ func 天数奖励(deadline time.Time) {
 		}
 		if i <= 3 {
 			core.LogWithTimef("[福利领取] 从下往上翻页 %d/3", i)
-			core.SwipeStraight(594, 557, 594, 357, 1500)
+			core.RandomSwipe(594, 557, 594, 357, 1500)
 		} else {
 			core.LogWithTimef("[福利领取] 从上往下翻页 %d/3", i-3)
-			core.SwipeStraight(594, 357, 594, 557, 1000)
+			core.RandomSwipe(594, 357, 594, 557, 1000)
 		}
 
 		翻页红点 := core.ExecAll("红点", 373, 311, 950, 641)
@@ -116,7 +116,7 @@ func 积分奖励(deadline time.Time) {
 			break
 		}
 		core.LogWithTimef("[福利领取] 从下往上翻页 %d/6", i)
-		core.SwipeStraight(1062, 547, 1064, 407, 1500)
+		core.RandomSwipe(1062, 547, 1064, 407, 1500)
 		翻页红点 := core.ExecAll("红点", 968, 353, 1066, 639)
 		for _, p := range 翻页红点 {
 			if IsStopped() || time.Now().After(deadline) {

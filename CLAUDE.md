@@ -25,6 +25,10 @@ shell commands, and other important information, read the current plan
 
 
 ## 不要做的事
+- **动手前必读本文件（CLAUDE.md）对应小节，逐条对照再落笔，禁止凭"通用编程直觉"写**。本项目多处规则是"反通用"的（内联、禁自造方法、嵌套结构不动），原则：**项目规则 > 你的判断**
+- **一次性/单处使用的坐标、常量、颜色、阈值一律内联写数字，禁止抽成 `var`/`const`**。只有同一值被 2 处及以上引用才允许抽变量（抽了就得处处复用）。反例：`var 每日任务区域 = [4]int{583,163,758,639}` 被批
+- **不新增本文件里没有的方法/变量/封装**。曾自创 `ClickRecogLoop` 被批；"识别到就点它"统一用 `ClickRecog`
+- **循环结束条件用 `deadline := time.Now().Add(...)` + `for time.Now().Before(deadline)` + `if IsStopped()` 自己写**，不编造"最大轮数"常量（除非用户明说）
 - 不要在没有 spec 的情况下直接写业务逻辑代码
 - 不要跳过 TDD（先写测试！）
 - 不要修改 thridPackage 下的 DLL

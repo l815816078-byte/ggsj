@@ -161,7 +161,7 @@ func RandomClickInAreaWithDelay(x1, y1, x2, y2 int, delay ...int) {
 	// 先执行点击
 	RandomClickInArea(x1, y1, x2, y2)
 	// 点击后随机延迟
-	minDelay, maxDelay := 1500, 2000
+	minDelay, maxDelay := 2000, 2500
 	switch len(delay) {
 	case 1:
 		minDelay, maxDelay = delay[0], delay[0]
@@ -175,6 +175,38 @@ func RandomClickInAreaWithDelay(x1, y1, x2, y2 int, delay ...int) {
 func RandomSleep(min, max int) {
 	randNum := utils.Random(min, max)
 	utils.Sleep(randNum)
+}
+
+// RandomSwipe 通用滑动：起终点四个坐标各随机偏移 ±5px，滑动后自动延时。
+// 以后所有滑动统一用这个方法。
+//
+// 说明:
+//   - x1,y1,x2,y2 每个坐标都叠加 [-5,5] 的随机偏移（避免固定点被识别）
+//   - duration 为滑动持续时间（毫秒）
+//   - delay 可选：滑动后延时（毫秒）。不传 = 默认等于"滑动秒数"（即 duration，单位换算后同值）
+//
+// 参数:
+//   - x1, y1, x2, y2: 滑动起终点基础坐标
+//   - duration: 滑动持续时间（毫秒）
+//   - delay: 可选，滑动后延时（毫秒）；不传则默认 = duration（即"滑动秒数"）
+func RandomSwipe(x1, y1, x2, y2, duration int, delay ...int) {
+	// 四个坐标各随机 ±5px
+	sx := x1 + utils.Random(-5, 5)
+	sy := y1 + utils.Random(-5, 5)
+	ex := x2 + utils.Random(-5, 5)
+	ey := y2 + utils.Random(-5, 5)
+	motion.Swipe(sx, sy, ex, ey, duration, 0, 0)
+
+	// 滑动后延时：默认 = 滑动秒数（duration 毫秒 → 同值毫秒）
+	d := duration
+	if len(delay) > 0 {
+		d = delay[0]
+	}
+	if d > 0 {
+		utils.Sleep(d)
+	}
+	LogWithTimef("[Swipe] 随机滑动 基础(%d,%d)→(%d,%d) 实际(%d,%d)→(%d,%d) 时长=%dms 延时=%dms",
+		x1, y1, x2, y2, sx, sy, ex, ey, duration, d)
 }
 
 // SwipeStraight 精确直线滑动：起终点坐标完全一致，无任何随机偏移

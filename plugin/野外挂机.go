@@ -8,7 +8,6 @@ import (
 
 func init() {
 	Register(&野外挂机{})
-	Register(&挂机中{})
 }
 
 // 野外挂机 插件：去 英勇的清山，按战力选最符合的地点，走"去地图"那套。
@@ -86,43 +85,4 @@ func 最低门槛地点(列表 []地点) 地点 {
 		}
 	}
 	return 候选[rand.Intn(len(候选))]
-}
-
-// 挂机中 插件：检测到"自动攻击开启中"即认为正在挂机中。
-// 挂机中顺带跑子任务（按顺序，冷却 1000 秒避免每轮重复执行）；
-// 命中返回 "ok"（挂机中），没检测到返回 "no"。
-type 挂机中 struct{}
-
-func (p *挂机中) Name() string { return "挂机中" }
-
-func (p *挂机中) Exec(ctx *Context) (string, error) {
-	if !core.Exec("自动攻击开启中").Found {
-		return "no", nil
-	}
-	core.LogWithTimef("[挂机中] 检测到自动攻击开启中 → 正在挂机")
-
-	// 这些子任务每轮随机顺序执行（名称 + 冷却配对）
-	子任务 := []struct {
-		名 string
-		冷 int
-	}{
-		{"领取邮件", 10000},
-		{"领取成就", 10000},
-		{"福利领取", 10000},
-		{"灵力修炼", 300},
-		{"气运显现", 10000},
-	}
-	rand.Shuffle(len(子任务), func(i, j int) { 子任务[i], 子任务[j] = 子任务[j], 子任务[i] })
-	for _, t := range 子任务 {
-		RunTask(t.名, t.冷)
-		core.RandomSleep(1000, 3000)
-	}
-
-	RunTask("背包物品", 1000)
-	core.RandomSleep(1000, 3000)
-
-	// 背包物品之后，主动做一次任务轮转弹窗清扫
-	ClearPopups()
-
-	return "ok", nil
 }

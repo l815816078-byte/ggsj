@@ -6,12 +6,12 @@ import (
 	"app/core"
 )
 
-// CheckLoop 场景循环检测（只检测，不点击）：3 秒内每隔 1 秒检测一次，命中一次立即返回 true，超时返回 false。
+// CheckLoop 场景循环检测（只检测，不点击）：timeout 内每隔 interval 检测一次，命中一次立即返回 true，超时返回 false。
 // 可选 region [x1,y1,x2,y2]：传入时覆盖预设区域。
 // 用途：检测"当前是什么场景/在哪一页"（缔造师挑战、挑战任务、活动、背包列表…），
 // 画面切换需要时间，单次检测容易漏，循环检测更稳。
-func CheckLoop(name string, region ...int) bool {
-	end := time.Now().Add(3 * time.Second)
+func CheckLoop(name string, timeout, interval time.Duration, region ...int) bool {
+	end := time.Now().Add(timeout)
 	for {
 		if core.Exec(name, region...).Found {
 			return true
@@ -19,15 +19,15 @@ func CheckLoop(name string, region ...int) bool {
 		if time.Now().After(end) {
 			return false
 		}
-		core.RandomSleep(1000, 1000)
+		core.RandomSleep(int(interval.Milliseconds()), int(interval.Milliseconds()))
 	}
 }
 
-// CheckLoopClick 场景循环检测（检测到就点）：3 秒内每隔 1 秒检测一次，命中就点它一次并立即返回 true，超时返回 false。
+// CheckLoopClick 场景循环检测（检测到就点）：timeout 内每隔 interval 检测一次，命中就点它一次并立即返回 true，超时返回 false。
 // 可选 region [x1,y1,x2,y2]：传入时覆盖预设区域。
 // 用途：检测到某场景/按钮就点（回退、商店…），复用 ClickRecog。
-func CheckLoopClick(name string, region ...int) bool {
-	end := time.Now().Add(3 * time.Second)
+func CheckLoopClick(name string, timeout, interval time.Duration, region ...int) bool {
+	end := time.Now().Add(timeout)
 	for {
 		if ClickRecog(name, region...) {
 			return true
@@ -35,7 +35,7 @@ func CheckLoopClick(name string, region ...int) bool {
 		if time.Now().After(end) {
 			return false
 		}
-		core.RandomSleep(1000, 1000)
+		core.RandomSleep(int(interval.Milliseconds()), int(interval.Milliseconds()))
 	}
 }
 
