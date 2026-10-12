@@ -56,34 +56,37 @@ func (p *挂机中) Exec(ctx *Context) (string, error) {
 	core.RandomSleep(10000, 100000) // 挂机中 10-100 秒随机延迟 这样每个 账号操作任务的间隔会不一样
 	ctx.Global["上次打怪时间"] = ctx.Global["上次打怪时间"].(time.Time).Add(time.Since(sleep开始))
 
-	// 子任务期间不算"没打怪"时间：跑子任务前记时间，跑完把耗时补回到上次打怪时间上
-	子任务开始 := time.Now()
-	// 子任务每轮随机顺序执行（名称 + 冷却区间，秒）；冷却取区间内随机值
-	子任务 := []struct {
-		名     string
-		冷最小 int
-		冷最大 int
-	}{
-		{"领取邮件", 10000, 20000},
-		{"领取成就", 10000, 20000},
-		{"福利领取", 10000, 20000},
-		{"灵力修炼", 2500, 5000},
-		{"气运显现", 10000, 20000},
-		{"背包物品", 5000, 10000},
-	}
-	rand.Shuffle(len(子任务), func(i, j int) { 子任务[i], 子任务[j] = 子任务[j], 子任务[i] })
-	执行过 := false
-	for _, t := range 子任务 {
-		if RunTask(t.名, t.冷最小+rand.Intn(t.冷最大-t.冷最小+1)) {
-			执行过 = true
-			core.RandomSleep(1000, 3000)
+	// 只有【野外挂机】任务才跑子任务（落花战场不跑）
+	if ctx.TaskName == "野外挂机" {
+		// 子任务期间不算"没打怪"时间：跑子任务前记时间，跑完把耗时补回到上次打怪时间上
+		子任务开始 := time.Now()
+		// 子任务每轮随机顺序执行（名称 + 冷却区间，秒）；冷却取区间内随机值
+		子任务 := []struct {
+			名     string
+			冷最小 int
+			冷最大 int
+		}{
+			{"领取邮件", 10000, 20000},
+			{"领取成就", 10000, 20000},
+			{"福利领取", 10000, 20000},
+			{"灵力修炼", 2500, 5000},
+			{"气运显现", 10000, 20000},
+			{"背包物品", 5000, 10000},
 		}
-	}
-	ctx.Global["上次打怪时间"] = ctx.Global["上次打怪时间"].(time.Time).Add(time.Since(子任务开始))
+		rand.Shuffle(len(子任务), func(i, j int) { 子任务[i], 子任务[j] = 子任务[j], 子任务[i] })
+		执行过 := false
+		for _, t := range 子任务 {
+			if RunTask(t.名, t.冷最小+rand.Intn(t.冷最大-t.冷最小+1)) {
+				执行过 = true
+				core.RandomSleep(1000, 3000)
+			}
+		}
+		ctx.Global["上次打怪时间"] = ctx.Global["上次打怪时间"].(time.Time).Add(time.Since(子任务开始))
 
-	// 有子任务真的执行过 → 主动做一次任务轮转弹窗清扫
-	if 执行过 {
-		ClearPopups()
+		// 有子任务真的执行过 → 主动做一次任务轮转弹窗清扫
+		if 执行过 {
+			ClearPopups()
+		}
 	}
 
 	return "ok", nil

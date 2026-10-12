@@ -113,7 +113,8 @@ func (p *落花战场) Exec(ctx *Context) (string, error) {
 
 	// 8) 主循环：只检测【战场地图】→ 用配置的区域点击（点不到寻路中就换下一个区域）
 	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
+	寻路中 := false
+	for time.Now().Before(deadline) && !寻路中 {
 		if IsStopped() {
 			return "no", nil
 		}
@@ -134,16 +135,17 @@ func (p *落花战场) Exec(ctx *Context) (string, error) {
 				目标点位.名称, 区[0], 区[1], 区[2], 区[3], cx, cy)
 			core.RandomClickInAreaWithDelay(cx, cy, cx, cy)
 			if CheckLoop("寻路中", 10*time.Second, 2*time.Second) {
-				core.LogWithTimef("[落花战场] 检测到【寻路中】→ 点击成功")
+				core.LogWithTimef("[落花战场] 检测到【寻路中】→ 点击成功，断开所有循环")
+				寻路中 = true
 				break
 			}
 			core.LogWithTimef("[落花战场] 未检测到【寻路中】→ 换下一个区域")
 		}
 	}
 
-	// 9) 循环查找【怪物】(30秒/3秒)，找到点击退出
-	if !CheckLoopClick("怪物", 30*time.Second, 3*time.Second) {
-		core.LogWithTimef("[落花战场] 30秒内未找到【怪物】→ 失败")
+	// 9) 循环检测【怪物】(60秒/2秒)，只找不点
+	if !CheckLoop("怪物", 60*time.Second, 2*time.Second) {
+		core.LogWithTimef("[落花战场] 60秒内未检测到【怪物】→ 失败")
 		return "no", nil
 	}
 
