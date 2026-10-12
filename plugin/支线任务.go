@@ -19,6 +19,10 @@ func (p *支线任务) Name() string { return "支线任务" }
 
 func (p *支线任务) Exec(ctx *Context) (string, error) {
 	ClickRecog("支线任务")
+
+	// 接取之前：先点【组队】【任务入口】
+	点组队与任务入口()
+
 	ClickAdaptive(2000, 1000, nil,
 		btn("接受", 3),
 		btn("确认", 3),

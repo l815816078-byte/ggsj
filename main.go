@@ -14,6 +14,26 @@ import (
 // 进商店检测"购买完成"实际判定，命中后全局置位，之后不再检测（见 plugin/检测交易行开启.go）。
 
 func main() {
+	// ==================== 每日任务 ExecAll 多结果测试 ====================
+	/*	imageHandler.SetDict("ziku.txt", "library")
+		pts := core.ExecAll("每日任务", 929, 99, 981, 371)
+		fmt.Printf("[每日任务测试] 命中 %d 个\n", len(pts))
+		for i, pt := range pts {
+			fmt.Printf("  #%d 坐标=(%d,%d) X2,Y2=(%d,%d) Sim=%.2f Word=%s Type=%s\n",
+				i+1, pt.X, pt.Y, pt.X2, pt.Y2, pt.Sim, pt.Word, pt.Type)
+		}
+		select {}*/
+	/*{
+		imageHandler.SetDict("ziku.txt", "library")
+		for i := 0; i < 10; i++ {
+			t0 := time.Now()
+			r := core.Exec("自动攻击开启中")
+			fmt.Printf("[多区域验证] Found=%v 命中坐标=(%d,%d) 耗时=%.2fms\n",
+				r.Found, r.X, r.Y, float64(time.Since(t0).Microseconds())/1000.0)
+			core.RandomSleep(500, 500)
+		}
+		select {}
+	}*/
 
 	// ====================================================
 	/*	beibao.RunBeibaoRecognize()
@@ -116,6 +136,8 @@ func main() {
 	// 2. 创建 Bot
 	cfg := bot.DefaultBotConfig()
 	b := bot.NewBot(cfg)
+
+	// ================================================================
 
 	// 3. 初始化
 	if err := b.Init(); err != nil {

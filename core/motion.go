@@ -202,11 +202,11 @@ func RandomSwipe(x1, y1, x2, y2, duration int, delay ...int) {
 	if len(delay) > 0 {
 		d = delay[0]
 	}
+	LogWithTimef("[Swipe] 随机滑动 基础(%d,%d)→(%d,%d) 实际(%d,%d)→(%d,%d) 时长=%dms 延时=%dms",
+		x1, y1, x2, y2, sx, sy, ex, ey, duration, d)
 	if d > 0 {
 		utils.Sleep(d)
 	}
-	LogWithTimef("[Swipe] 随机滑动 基础(%d,%d)→(%d,%d) 实际(%d,%d)→(%d,%d) 时长=%dms 延时=%dms",
-		x1, y1, x2, y2, sx, sy, ex, ey, duration, d)
 }
 
 // SwipeStraight 精确直线滑动：起终点坐标完全一致，无任何随机偏移

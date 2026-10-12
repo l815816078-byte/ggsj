@@ -35,7 +35,10 @@ func (p *野外挂机) Exec(ctx *Context) (string, error) {
 	core.LogWithTimef("[野外挂机] 目标：主城【%s】→ 地点【%s】(战力门槛 %d)",
 		配置.主城名, 地点.名称, 地点.战力门槛)
 
-	去地图(配置, 地点)
+	if !去地图(配置, 地点) {
+		core.LogWithTimef("[野外挂机] 去地图失败 → 返回失败")
+		return "no", nil
+	}
 	return "ok", nil
 }
 

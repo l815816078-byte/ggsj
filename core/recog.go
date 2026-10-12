@@ -51,6 +51,23 @@ func Exec(name string, region ...int) *RecogResult {
 	if len(region) >= 4 {
 		cfg = copyRecogWithRegion(cfg, region[0], region[1], region[2], region[3])
 	}
+	// 多区域：截图区域为 [[..],[..],...] 时，按顺序逐个区域识别，第一个命中就返回
+	if 区域列表 := recogRegions(cfg); len(区域列表) > 1 && len(region) < 4 {
+		for _, 区 := range 区域列表 {
+			sub := copyRecogWithRegion(cfg, 区[0], 区[1], 区[2], 区[3])
+			r := ExecWithConfig(sub)
+			if r.Found {
+				debugRecogLog(name, sub, r)
+				RecordConfigHit()
+				if off := recogOffset(cfg, "坐标偏移"); off != [2]int{} && !centerOffsetMerged(cfg) {
+					r.X += off[0]
+					r.Y += off[1]
+				}
+				return r
+			}
+		}
+		return &RecogResult{}
+	}
 	r := ExecWithConfig(cfg)
 	debugRecogLog(name, cfg, r)
 	if r.Found {
@@ -498,6 +515,35 @@ func recogRegion(cfg map[string]interface{}) (int, int, int, int) {
 		return 0, 0, 0, 0
 	}
 	return toInt(arr[0]), toInt(arr[1]), toInt(arr[2]), toInt(arr[3])
+}
+
+// recogRegions 解析"截图区域"为多个区域：
+//   - 单区域写法 [x1,y1,x2,y2]        → 返回 1 个区域
+//   - 多区域写法 [[x1,y1,x2,y2], ...] → 返回多个区域（按顺序）
+//
+// 多区域用于"同一个预设在不同位置可能出现"：识别时逐个区域试，第一个命中就返回。
+func recogRegions(cfg map[string]interface{}) [][4]int {
+	raw, ok := cfg["截图区域"].([]interface{})
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	// 判断是否多区域：第一个元素本身是数组
+	if _, isArr := raw[0].([]interface{}); isArr {
+		out := make([][4]int, 0, len(raw))
+		for _, item := range raw {
+			sub, ok := item.([]interface{})
+			if !ok || len(sub) < 4 {
+				continue
+			}
+			out = append(out, [4]int{toInt(sub[0]), toInt(sub[1]), toInt(sub[2]), toInt(sub[3])})
+		}
+		return out
+	}
+	// 单区域
+	if len(raw) < 4 {
+		return nil
+	}
+	return [][4]int{{toInt(raw[0]), toInt(raw[1]), toInt(raw[2]), toInt(raw[3])}}
 }
 
 func recogString(cfg map[string]interface{}, key string) string {
