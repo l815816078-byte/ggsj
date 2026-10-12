@@ -181,11 +181,11 @@ func 买药() {
 // 返回 true = 成功去成；false = 中途失败（没打开地图/没找到主城/没找到地点/没传送到）
 func 去地图(配置 地图配置, 目标地点 地点) bool {
 	// 打开地图 → 地图列表（任一没找到 → 直接失败，不往下走）
-	if !ClickRecog("地图") {
+	if !CheckLoopClick("地图", 6*time.Second, 2*time.Second) {
 		core.LogWithTimef("[去地图] 未找到【地图】→ 失败")
 		return false
 	}
-	if !ClickRecog("地图列表") {
+	if !CheckLoopClick("地图列表", 6*time.Second, 2*time.Second) {
 		core.LogWithTimef("[去地图] 未找到【地图列表】→ 失败")
 		return false
 	}

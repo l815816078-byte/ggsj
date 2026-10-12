@@ -101,6 +101,10 @@ type Btn struct {
 	// ClickOffset = 点击偏移 [dx,dy]：命中后点击"命中坐标 + 偏移"（(x+dx, y+dy)）。
 	// 零值 [0,0] = 不偏移（点命中点本身）。
 	ClickOffset [2]int
+	// Stop = true 表示"命中即停"：命中后**不点击**本按钮，并让 ClickAdaptive
+	// **立即返回 true**（不再点其他按钮、不等超时）。用 btnStop(name, ...) 构造。
+	// 用途：检测到某标志（如【召唤用光】）即视为完成，且绝不能点它。
+	Stop bool
 }
 
 // btn 构造自适应按钮项，可选参数按类型/顺序解析（都传基本类型，无需自定义标记）：
@@ -140,6 +144,17 @@ func btn(name string, opts ...any) Btn {
 	} else if len(ints) == 1 {
 		b.SkipStreak = ints[0] // 只传 1 个 int = 抑制轮数（不指定区域）
 	}
+	return b
+}
+
+// btnStop 构造"命中即停"按钮项：命中后**不点击**它，ClickAdaptive **立即返回 true**。
+// 参数同 btn（区域 / 跳过条件等均可用）。
+//
+//	btnStop("召唤用光")                        // 检测到就用（不点）→ ClickAdaptive 立即返回 true
+//	btnStop("召唤用光", 453,644,552,682)       // 指定区域
+func btnStop(name string, opts ...any) Btn {
+	b := btn(name, opts...)
+	b.Stop = true
 	return b
 }
 
@@ -221,6 +236,15 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 					skipped[i] = true
 					continue
 				}
+			}
+
+			// 命中即停：不点击本按钮，立即返回 true（不再点其他按钮、不等超时）
+			if btns[i].Stop {
+				core.LogWithTimef("[Plugin] 自适应命中【%s】(%d,%d) → 命中即停（不点击）", btns[i].Name, r.X, r.Y)
+				if onHit != nil {
+					onHit(btns[i].Name)
+				}
+				return true
 			}
 
 			// 点击坐标 = 命中坐标 + 点击偏移（默认 [0,0] 即不偏移）

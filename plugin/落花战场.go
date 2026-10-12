@@ -76,7 +76,7 @@ func (p *落花战场) Exec(ctx *Context) (string, error) {
 		return "no", nil
 	}
 	core.RandomSwipe(1027, 579, 990, 127, 1000, 1000)
-	if !ClickRecog("落花战场") {
+	if !CheckLoopClick("落花战场", 6*time.Second, 2*time.Second) {
 		core.LogWithTimef("[落花战场] 未找到【落花战场】→ 失败")
 		return "no", nil
 	}
