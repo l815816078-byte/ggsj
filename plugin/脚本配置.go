@@ -1,72 +1,82 @@
 package plugin
 
+// 脚本配置集中加载 —— 把几个"常用要改的配置"(药品下限、落花商店)搬到 assets/脚本配置.json,
+// 改配置不用再动 Go 代码(改完重新编译即可, 和 recogs.json / tasks 一样是打进程序的)。
+//
+// 覆盖规则: 这些配置【只认这份 JSON】, Go 里没有兜底默认值 ——
+//   - JSON 里配了 → 直接用
+//   - 没配 / 空数组 / 文件不存在 / 解析失败 → 该项不生效(数组空=不做, 数量 0=不限),
+//     并在加载时打日志提示(不会因为配置缺失直接崩)。
+//
+// 注意: 下面给 encoding/json 跨包解析用的 struct 字段名【必须是导出名(首字符大写)】,
+// JSON 键名本身靠 `json:"中文"` tag 映射, 所以字段名可随意, 但绝不能用中文首字符
+// (中文字符不属于 Unicode 大写字母, Go 视为未导出, json 包会静默丢弃该字段)。
+//
+// 新增一项的步骤: ①脚本配置.json 加 { "_说明":..., "值":... }
+// ②下面 scriptConfig 结构加对应字段 ③加一个取值函数 ④Go 里 var X = scriptXxx()
+
 import (
 	"encoding/json"
-	"os"
-	"sync"
 
 	"app/assets"
 	"app/core"
 )
 
-// scriptConfigFile 内置脚本配置文件名（go:embed 于 assets.ScriptConfig）
+// scriptConfigFile 脚本配置.json 的文件名(嵌在 assets 里)
 const scriptConfigFile = "脚本配置.json"
 
-// 真机脚本配置文件路径（中控下发配置写在这里，优先于内置，重启后生效）
-const 本机脚本配置 = "/sdcard/脚本配置.json"
-
-// 落花商店物品 落花商店要买的物品：物品名（= recogs 预设名）+ 购买数量（默认显示 1，配置 N 就再点 N-1 次【加1】）
-type 落花商店物品 struct {
-	物品名 string `json:"物品名"`
-	数量   int    `json:"数量"`
-}
-
-// scriptConfig 脚本配置（内置 json 读取）
+// scriptConfig 脚本配置.json 的整体结构。
+// 每项都是 { "_说明": ..., "值": ... } 的形式: "_说明" 只给人看, 代码只读 "值"。
 type scriptConfig struct {
-	// 药品下限：当前药品数量低于该值就买药（默认 50）
-	药品下限 int `json:"药品下限"`
-	// 落花商店：要买的物品列表（按顺序买）
-	落花商店 []落花商店物品 `json:"落花商店"`
+	DrugLimit struct {
+		Val int `json:"值"`
+	} `json:"药品下限"`
+
+	FlowerShop struct {
+		Val []scriptFlowerShopItem `json:"值"`
+	} `json:"落花商店"`
 }
 
-var (
-	scriptConfigOnce sync.Once
-	scriptConfigData scriptConfig
-)
+// scriptFlowerShopItem 落花商店要买的一个物品
+type scriptFlowerShopItem struct {
+	Name string `json:"物品名"`
+	Qty  int    `json:"数量"`
+}
 
-// loadScriptConfig 读取【脚本配置.json】（只读一次，带默认值兜底）。
-// 优先读真机 /sdcard/脚本配置.json（中控下发的配置写在这里），读不到再退回内置 embed 的那份。
+// scriptCfg 全局脚本配置(包级变量, 最先初始化)
+var scriptCfg = loadScriptConfig()
+
+// loadScriptConfig 读 assets/脚本配置.json。
+// 读不到/解析失败 → 返回零值(各项为空), 调用方保留 Go 里的默认值。
 func loadScriptConfig() scriptConfig {
-	scriptConfigOnce.Do(func() {
-		scriptConfigData = scriptConfig{
-			药品下限: 50, // 默认值
-		}
-		if data, err := os.ReadFile(本机脚本配置); err == nil && len(data) > 0 {
-			if err := json.Unmarshal(data, &scriptConfigData); err != nil {
-				core.LogWithTimef("[脚本配置] %s 解析失败: %v → 改用内置配置", 本机脚本配置, err)
-			} else {
-				core.LogWithTimef("[脚本配置] 已加载 %s（%d 字节，落花商店 %d 个物品）",
-					本机脚本配置, len(data), len(scriptConfigData.落花商店))
-			}
-		} else if data, err := assets.ScriptConfig.ReadFile(scriptConfigFile); err == nil && len(data) > 0 {
-			if err := json.Unmarshal(data, &scriptConfigData); err != nil {
-				core.LogWithTimef("[脚本配置] 内置配置解析失败: %v", err)
-			} else {
-				core.LogWithTimef("[脚本配置] 已加载内置配置（%d 字节，落花商店 %d 个物品）",
-					len(data), len(scriptConfigData.落花商店))
-			}
-		} else {
-			core.LogWithTimef("[脚本配置] %s 与内置配置都读不到 → 只用默认值", 本机脚本配置)
-		}
-		// 兜底：json 里没配或配成 0 时用默认 50
-		if scriptConfigData.药品下限 <= 0 {
-			scriptConfigData.药品下限 = 50
-		}
-	})
-	return scriptConfigData
+	var cfg scriptConfig
+	data, err := assets.ScriptConfig.ReadFile(scriptConfigFile)
+	if err != nil {
+		core.LogWithTimef("[脚本配置] 读取 %s 失败 → 用 Go 里的默认配置: %v", scriptConfigFile, err)
+		return cfg
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		core.LogWithTimef("[脚本配置] %s 解析失败 → 相关配置不生效(数组空=不做, 数量0=不限): %v",
+			scriptConfigFile, err)
+		return scriptConfig{}
+	}
+	return cfg
 }
 
-// GetScriptConfig 获取脚本配置
-func GetScriptConfig() scriptConfig {
-	return loadScriptConfig()
+// ───── 药品下限 ─────
+
+// scriptDrugLimit 药品下限(只认 JSON): 没配/0 → 调用方用默认 50
+func scriptDrugLimit() int {
+	return scriptCfg.DrugLimit.Val
+}
+
+// ───── 落花商店 ─────
+
+// scriptFlowerShop 落花商店物品名单(只认 JSON): 没配/空 = 不买任何东西
+func scriptFlowerShop() []scriptFlowerShopItem {
+	c := scriptCfg.FlowerShop.Val
+	if len(c) == 0 {
+		core.LogWithTimef("[脚本配置] '落花商店' 没配 → 落花商店不买任何物品")
+	}
+	return c
 }

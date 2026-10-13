@@ -49,8 +49,13 @@ var (
 	指定地点 = "商店"
 )
 
-// 药品下限：当前药品数量低于该值就买药（默认 50）
-var 药品下限 = 50
+// 药品下限：当前药品数量低于该值就买药；读 scriptDrugLimit()（assets/脚本配置.json），没配则默认 50
+var 药品下限 = func() int {
+	if v := scriptDrugLimit(); v > 0 {
+		return v
+	}
+	return 50
+}()
 
 // 取配置 按 指定主城/指定地点 取出配置与地点；找不到返回 ok=false
 func 取配置(主城名, 地点名 string) (地图配置, 地点, bool) {
