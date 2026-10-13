@@ -29,10 +29,14 @@ type 复活 struct{}
 func (p *复活) Name() string { return "复活" }
 
 func (p *复活) Exec(ctx *Context) (string, error) {
-	// 先做一次任务轮转弹窗清扫，再检测【复活】（复活可能被弹窗挡着识别不到）
-	ClearPopups()
+	//先检测【复活】（复活可能被弹窗挡着识别不到）
 	if !ClickRecog("复活") {
 		return "no", nil
+	}
+	// 先滑掉省电模式（它浮在最上层，会挡住【复活】的识别）
+	if core.Exec("省电模式").Found {
+		core.LogWithTimef("[复活] 检测到【省电模式】→ 滑动 539,263 → 750,466")
+		core.RandomSwipe(539, 263, 750, 466, 2000, 2000)
 	}
 
 	n := 复活次数.Add(1)

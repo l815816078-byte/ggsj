@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"strconv"
 	"time"
 
 	"app/core"
@@ -120,12 +121,36 @@ type 自动买药 struct{}
 func (p *自动买药) Name() string { return "自动买药" }
 
 func (p *自动买药) Exec(ctx *Context) (string, error) {
-	// 1) 检测是否缺药（6秒内每2秒检测一次，检测到就停）
-	if !CheckLoop("是否缺药", 6*time.Second, 2*time.Second) {
-		core.LogWithTimef("[自动买药] 6秒内未检测到缺药 → 结束")
+	// 1) 检测是否需要买药（6秒内每2秒检测一次，读到/识别到就停）：
+	//    【药品数量】读到的数字 <= 药品下限（脚本配置），或【是否缺药】命中 → 要去买药
+	数量 := -1
+	deadline := time.Now().Add(6 * time.Second)
+	for time.Now().Before(deadline) {
+		if IsStopped() || IsTaskCancelled() {
+			return "no", nil
+		}
+		if r := core.Exec("药品数量"); r.Found {
+			数量, _ = strconv.Atoi(r.Word)
+			break
+		}
+		if core.Exec("是否缺药").Found {
+			数量 = 0
+			break
+		}
+		core.RandomSleep(2000, 2000)
+	}
+	if 数量 < 0 {
+		core.LogWithTimef("[自动买药] 6秒内既没读到【药品数量】也没识别到【是否缺药】→ 结束")
 		return "ok", nil
 	}
-	core.LogWithTimef("[自动买药] 检测到缺药 → 开始去主城买药")
+	if 数量 == 0 {
+		core.LogWithTimef("[自动买药] 识别到【是否缺药】→ 开始去主城买药")
+	} else if 数量 > 药品下限 {
+		core.LogWithTimef("[自动买药] 药品数量 %d > 下限 %d → 不缺药，结束", 数量, 药品下限)
+		return "ok", nil
+	} else {
+		core.LogWithTimef("[自动买药] 药品数量 %d <= 下限 %d → 缺药，开始去主城买药", 数量, 药品下限)
+	}
 
 	// 指定"去哪个主城下的哪个地点"（用时改这两个变量）
 	配置, 目标地点, ok := 取配置(指定主城, 指定地点)

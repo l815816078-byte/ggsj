@@ -332,6 +332,11 @@ func (s *Scheduler) executeTask(t *task.RuntimeTask) bool {
 	plugin.SetCurrentCancel(nil)
 	s.running = nil
 
+	// 任务间隔延时：上一个任务的收尾动画/弹窗还没落定，先等界面回稳再让下一轮调度取新任务
+	core.LogWithTimef("[Scheduler] %s 已结束，等待任务间隔延时（3~5 秒）", t.Name())
+	core.RandomSleep(3000, 5000)
+	core.LogWithTimef("[Scheduler] 任务间隔延时结束 → 可调度下一个任务")
+
 	if 超时 {
 		t.SetState(task.TaskFailed)
 		core.SetStatusColor("#FF5555", "%s 超时", t.Name())

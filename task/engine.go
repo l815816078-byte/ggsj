@@ -202,10 +202,10 @@ func (e *PipelineEngine) sweepOnce(exclude map[string]bool, ban map[string]bool)
 			r = core.Exec(p.RecogRef) // 区域留空 → 用 recogs.json 预设的区域
 		}
 		if !r.Found {
-			core.LogWithTimef("[Engine] 弹窗清扫: 场景【%s】引用=%s → 未命中", p.Name, p.RecogRef)
+			core.LogWithTimef("[Engine] 【任务轮转】清扫: 场景【%s】引用=%s → 未命中", p.Name, p.RecogRef)
 			continue
 		}
-		core.LogWithTimef("[Engine] 弹窗清扫: 场景【%s】引用=%s → 命中 (%d,%d)", p.Name, p.RecogRef, r.X, r.Y)
+		core.LogWithTimef("[Engine] 【任务轮转】清扫: 场景【%s】引用=%s → 命中 (%d,%d)", p.Name, p.RecogRef, r.X, r.Y)
 		e.doAction(p, r.X, r.Y) // 复用引擎动作，点击/滑动都支持
 		if p.WaitAfter > 0 && p.Action != ActionSleep {
 			core.RandomSleep(p.WaitAfter/2, p.WaitAfter)
@@ -600,7 +600,7 @@ func (e *PipelineEngine) swipeRetry(step *StepConfig, swipeCount *int) bool {
 // 提示话只在屏幕上停留约 2 秒，必须先于全局识别弹窗执行；否则会被全局全屏 OCR
 // 弹窗挡在后面，等扫到时话已消失 → 死循环点任务。此改动只调整扫描顺序，不改任何弹窗逻辑。
 func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plugin.Context) *ExecResult {
-	core.LogWithTimef("[Engine] %s 开始扫弹窗（共 %d 项）", e.config.Name, len(e.popups))
+	core.LogWithTimef("[Engine] %s 【弹窗处理】开始扫（共 %d 项）", e.config.Name, len(e.popups))
 
 	// 第一遍：插件模式弹窗（时效性提示优先处理）
 	for i := range e.popups {
@@ -654,10 +654,10 @@ func (e *PipelineEngine) checkPopups(rs *RunState, deadline time.Time, ctx *plug
 		}
 
 		if pMatched {
-			core.LogWithTimef("[Engine] %s 弹窗匹配: %s (引用:%s) 跳过引用:%v", e.config.Name, p.Name, p.RecogRef, p.SkipRecogRefs)
+			core.LogWithTimef("[Engine] %s 【弹窗处理】匹配: %s (引用:%s) 跳过引用:%v", e.config.Name, p.Name, p.RecogRef, p.SkipRecogRefs)
 			// 排除条件：命中任一"跳过识别引用"（如剧情中）→ 跳过本弹窗不点
 			if e.matchSkipRecogRefs(p) {
-				core.LogWithTimef("[Engine] %s 弹窗被排除跳过: %s", e.config.Name, p.Name)
+				core.LogWithTimef("[Engine] %s 【弹窗处理】被排除跳过: %s", e.config.Name, p.Name)
 				continue
 			}
 			// core.LogWithTimef("[Engine] %s 弹窗命中: %s", e.config.Name, p.Name)
