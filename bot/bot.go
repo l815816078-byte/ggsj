@@ -119,6 +119,21 @@ func (b *Bot) Init() error {
 	// 注入"插件内执行配置化任务"的实现（plugin 不能 import task，只能反向注入）
 	// 这样插件里 plugin.RunTask("背包物品使用") 就能直接跑 assets/tasks/*.json
 	plugin.SetRunTaskFunc(b.scheduler.RunTaskNow)
+	// 注入"插件内直接跑一遍任务流水线（子任务）"的实现。
+	// 与 RunTask 的区别：不走调度器、不写任务状态/冷却/HUD，只在调用方(外层任务)的
+	// goroutine 里同步跑完；并共享外层任务的取消令牌，外层一结束子任务立刻跟着停。
+	// 只是复用 JSON 的步骤轮转 + 流水线内嵌弹窗能力，不把它当"任务"。
+	plugin.SetRunSubTaskFunc(func(name string) bool {
+		t := b.loader.Get(name)
+		if t == nil {
+			core.LogWithTimef("[Bot] 子任务'%s' 不存在（检查 assets/tasks/*.json 的\"名称\"）", name)
+			return false
+		}
+		engine := task.NewPipelineEngine(t.Config())
+		engine.SetCancel(plugin.CurrentCancel()) // 共享外层任务的取消令牌
+		r := engine.Execute(&task.RunState{ExecutedCounts: make(map[string]int)})
+		return r.Error == nil
+	})
 	// 注入"插件内清除指定任务冷却"的实现（plugin 不能 import task，只能反向注入）
 	plugin.SetResetTaskCooldownFunc(b.scheduler.ResetTaskCooldown)
 	// 注入"插件内清一次任务轮转弹窗"的实现（plugin 不能 import task，只能反向注入）

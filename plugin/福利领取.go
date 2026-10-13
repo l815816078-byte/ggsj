@@ -50,7 +50,7 @@ func (p *福利领取) Exec(ctx *Context) (string, error) {
 			break
 		}
 		core.LogWithTimef("[福利领取] 外层红点(%d,%d) → 点击", op.X, op.Y)
-		core.RandomClickInAreaWithDelay(op.X, op.Y, op.X+3, op.Y+3)
+		core.RandomClickInAreaWithDelay(op.X, op.Y, op.X+10, op.Y+10)
 
 		// 内层：点开这一项后扫内层红点，逐个点
 		内层点 := core.ExecAll("红点", 362, 247, 1152, 637)

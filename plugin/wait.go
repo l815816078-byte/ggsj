@@ -68,10 +68,40 @@ func ClickRecogOffset(name string, offX, offY int, region ...int) bool {
 		core.LogWithTimef("[Plugin] 未识别到【%s】，跳过点击", name)
 		return false
 	}
+	// 优先级 1：预设配了"点击区域" → 只要命中就直接用该区域点击（忽略命中点/偏移/截图区域）
+	if arr := core.GetRecogArray(name, "点击区域"); len(arr) >= 4 {
+		x1, y1, x2, y2 := int(arr[0].(float64)), int(arr[1].(float64)), int(arr[2].(float64)), int(arr[3].(float64))
+		core.LogWithTimef("[Plugin] 点击【%s】用配置点击区域 %d,%d,%d,%d", name, x1, y1, x2, y2)
+		core.RandomClickInAreaWithDelay(x1, y1, x2, y2)
+		return true
+	}
+	// 优先级 2：预设开了"点击用截图区域" → 用截图区域当点击范围
+	if core.GetRecogBool(name, "点击用截图区域") {
+		x1, y1, x2, y2 := 点击区域(name, region)
+		core.LogWithTimef("[Plugin] 点击【%s】用截图区域 %d,%d,%d,%d", name, x1, y1, x2, y2)
+		core.RandomClickInAreaWithDelay(x1, y1, x2, y2)
+		return true
+	}
 	x, y := r.X+offX, r.Y+offY
 	core.LogWithTimef("[Plugin] 点击【%s】(%d,%d)", name, x, y)
-	core.RandomClickInAreaWithDelay(x, y, x+3, y+3)
+	core.RandomClickInAreaWithDelay(x, y, x+5, y+5)
 	return true
+}
+
+// 点击区域 返回用于点击的矩形：优先用调用处传入的 region，否则用预设的"截图区域"（取第一个区域）
+func 点击区域(name string, region []int) (int, int, int, int) {
+	if len(region) >= 4 {
+		return region[0], region[1], region[2], region[3]
+	}
+	arr := core.GetRecogArray(name, "截图区域")
+	if len(arr) >= 4 {
+		x1, _ := arr[0].(float64)
+		y1, _ := arr[1].(float64)
+		x2, _ := arr[2].(float64)
+		y2, _ := arr[3].(float64)
+		return int(x1), int(y1), int(x2), int(y2)
+	}
+	return 0, 0, 0, 0
 }
 
 // adaptiveSkipTol 稳定命中抑制的"同位置"容差（像素）：两次命中坐标在 ±该值内视为同一位置
@@ -253,7 +283,7 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 			core.LogWithTimef("[Plugin] 点击【%s】(%d,%d)", btns[i].Name, clickX, clickY)
 			// 点击自带的"点击后延时"不计入超时预算：测出本次点击耗时，补回 deadline
 			t0 := time.Now()
-			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+3, clickY+3)
+			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+10, clickY+10)
 			deadline = deadline.Add(time.Since(t0))
 			if onHit != nil {
 				onHit(btns[i].Name)

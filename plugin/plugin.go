@@ -18,6 +18,31 @@ func SetStopped(v bool) { stoppedFlag.Store(v) }
 // IsStopped 查询是否已停止
 func IsStopped() bool { return stoppedFlag.Load() }
 
+// ---------- 当前任务的取消令牌 ----------
+// 调度器在任务开始时绑定该任务的取消令牌，任务彻底结束（引擎 goroutine 已退出）后解绑。
+// 令牌由 task.PipelineEngine 持有（每个引擎一个），子任务引擎会共享外层的令牌，
+// 于是"外层任务结束 → 子任务流水线 + 插件长循环"在各自的检查点一起退出。
+//
+// 与 stoppedFlag 的区别：stoppedFlag 是脚本级（停止脚本，所有任务都停）；
+// 这里是任务级（只停当前这一个任务，脚本继续跑下一个）。
+
+var 当前取消令牌 atomic.Pointer[atomic.Bool]
+
+// SetCurrentCancel 绑定当前任务的取消令牌（由 bot 调度器在 executeTask 里调用），传 nil = 解绑
+func SetCurrentCancel(p *atomic.Bool) { 当前取消令牌.Store(p) }
+
+// CurrentCancel 取当前任务的取消令牌（bot 建子任务引擎时用，让子任务共享外层令牌）
+func CurrentCancel() *atomic.Bool { return 当前取消令牌.Load() }
+
+// IsTaskCancelled 当前任务是否已被要求结束（引擎/插件的检查点自查用）。
+// 未绑定令牌（全量重启的登录流程、弹窗清扫临时引擎、单元测试）时恒为 false，不影响既有流程。
+func IsTaskCancelled() bool {
+	if p := 当前取消令牌.Load(); p != nil {
+		return p.Load()
+	}
+	return false
+}
+
 // Plugin 插件接口
 // JSON 步骤中 action="plugin"，name 匹配插件名时触发
 type Plugin interface {
@@ -149,6 +174,40 @@ func RunTask(name string, cooldownAfterSec ...int) bool {
 		cd = cooldownAfterSec[0]
 	}
 	return fn(name, cd)
+}
+
+// ---------- 子任务：直接跑一遍流水线（依赖反转）----------
+//
+// 子任务 = 只想复用 assets/tasks/<名字>.json 的步骤轮转 + 流水线内嵌弹窗能力，
+// 但**不作为"任务"**参与调度：不写任务状态、不压冷却、不占 HUD、不进 PickNext 自动轮转。
+// 它在调用方（外层任务）的同一个 goroutine 里同步跑完 —— 所以外层任务一结束，
+// 子任务必然已经结束，不会出现"任务结束了里面还在跑"。
+//
+// 与 RunTask 的区别：RunTask 走调度器(新建引擎+状态+冷却+HUD)，这里只跑流水线本身。
+// 与 RunTask 同理：task 包导入了 plugin，插件不能反向 import task，由外层(bot)注入实现。
+
+var (
+	runSubTaskMu sync.RWMutex
+	runSubTaskFn func(name string) bool
+)
+
+// SetRunSubTaskFunc 注入"按名字直接跑一遍任务流水线"的实现（由 bot 在 Init 时调用）
+func SetRunSubTaskFunc(fn func(name string) bool) {
+	runSubTaskMu.Lock()
+	runSubTaskFn = fn
+	runSubTaskMu.Unlock()
+}
+
+// RunSubTask 跑一遍指定任务的流水线（不参与调度、不写状态/冷却），返回是否跑成功。
+// 未注入实现（如单元测试/未走 bot 启动流程）时返回 false，不会 panic。
+func RunSubTask(name string) bool {
+	runSubTaskMu.RLock()
+	fn := runSubTaskFn
+	runSubTaskMu.RUnlock()
+	if fn == nil {
+		return false
+	}
+	return fn(name)
 }
 
 // ---------- 清除任务冷却（依赖反转） ----------

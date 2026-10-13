@@ -195,6 +195,11 @@ func RandomSwipe(x1, y1, x2, y2, duration int, delay ...int) {
 	sy := y1 + utils.Random(-5, 5)
 	ex := x2 + utils.Random(-5, 5)
 	ey := y2 + utils.Random(-5, 5)
+	// 时长 ±10% 微随机（模拟人手滑动速度不恒定，避免固定时长特征）
+	if duration > 0 {
+		margin := duration / 10
+		duration = duration + utils.Random(-margin, margin)
+	}
 	motion.Swipe(sx, sy, ex, ey, duration, 0, 0)
 
 	// 滑动后延时：默认 = 滑动秒数（duration 毫秒 → 同值毫秒）

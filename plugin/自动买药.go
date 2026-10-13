@@ -208,7 +208,7 @@ func 去地图(配置 地图配置, 目标地点 地点) bool {
 			} else {
 				// 没检测到折叠开 → 点击主城展开
 				core.LogWithTimef("[去地图] 第%d次找到主城【%s】%d,%d → 点开", i, 配置.主城名, r.X, r.Y)
-				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+3, r.Y+3)
+				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
 			}
 			找到主城 = true
 			break
@@ -223,7 +223,7 @@ func 去地图(配置 地图配置, 目标地点 地点) bool {
 			f := core.Exec("折叠开", 地图列表区域[:]...)
 			if f.Found {
 				core.LogWithTimef("[去地图] 折叠开第%d次找到【折叠开】%d,%d → 点击", j, f.X, f.Y)
-				core.RandomClickInAreaWithDelay(f.X, f.Y, f.X+3, f.Y+3)
+				core.RandomClickInAreaWithDelay(f.X, f.Y, f.X+10, f.Y+10)
 				core.RandomSleep(500, 1000)
 				continue
 			}
@@ -254,7 +254,7 @@ func 去地点(配置 地图配置, 目标地点 地点) bool {
 		r := core.Exec(目标地点.名称, 地图列表区域[:]...)
 		if r.Found {
 			core.LogWithTimef("[自动买药] 第%d次找到地点【%s】%d,%d → 点击", i, 目标地点.名称, r.X, r.Y)
-			core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+3, r.Y+3)
+			core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
 			找到 = true
 			break
 		}

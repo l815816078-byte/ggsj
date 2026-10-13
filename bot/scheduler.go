@@ -2,6 +2,7 @@ package bot
 
 import (
 	"app/core"
+	"app/plugin"
 	"app/task"
 	"context"
 	"fmt"
@@ -30,6 +31,11 @@ type Scheduler struct {
 	// 回调
 	onTaskComplete func(t *task.RuntimeTask)
 	onTaskError    func(t *task.RuntimeTask, err error)
+
+	// running 当前正在执行的任务（单飞锁）。
+	// executeTask 开头置上，确认引擎 goroutine 真正退出后才清空；
+	// 非空时 tick / RunTaskNow 都不再取新任务，保证同一时刻只有一个引擎在操作屏幕。
+	running *task.RuntimeTask
 }
 
 // NewScheduler 创建调度器
@@ -126,6 +132,10 @@ func (s *Scheduler) loop() {
 
 // tick 单次调度（自动）
 func (s *Scheduler) tick() {
+	// 上一个任务还没彻底退出 → 不取新任务（单飞：同一时刻只允许一个引擎在跑）
+	if s.running != nil {
+		return
+	}
 	// 从加载器取出最高优先级可用任务（只挑 JSON 里"自动调度":true 的）
 	t := s.loader.PickNext()
 	if t == nil {
@@ -155,6 +165,11 @@ func (s *Scheduler) RunTaskNow(name string, cooldownAfterSec int) bool {
 	}
 	if t.State() == task.TaskRunning {
 		core.LogWithTimef("[Scheduler] 手动执行跳过: 任务'%s' 正在运行中", name)
+		return false
+	}
+	// 单飞：已经有别的任务在执行（哪怕它已超时、正在等引擎退出）→ 一律不接受新任务
+	if s.running != nil && s.running != t {
+		core.LogWithTimef("[Scheduler] 手动执行跳过: 任务'%s' 正在执行中, 此时不接受'%s'", s.running.Name(), name)
 		return false
 	}
 	// 可运行性检查（冷却/时间窗口/等级/战力）：core.ExtendCooldown 设的强制冷却只有
@@ -211,9 +226,15 @@ func (s *Scheduler) ResetTaskCooldown(name string) bool {
 	return true
 }
 
-// executeTask 执行单个任务: 状态标记 → 引擎执行 → 超时保护 → 回调
-// 自动调度(tick) 与手动触发(RunTaskNow) 共用这一段，返回是否成功
+// executeTask 执行单个任务: 单飞标记 → 引擎执行 → 超时保护 → 等引擎真正退出 → 回调
+//
+// 自动调度(tick) 与手动触发(RunTaskNow) 共用这一段，返回是否成功。
+// 关键约束：本函数 return 之前，engine.Execute 的那个 goroutine 一定已经结束，
+// 绝不会留下还在操作屏幕的残留代码（s.running 也只有到那时才清空）。
 func (s *Scheduler) executeTask(t *task.RuntimeTask) bool {
+	// 单飞锁：置上"当前执行中"，只有确认引擎 goroutine 真正退出后才清空
+	s.running = t
+
 	// 标记为运行中 + 刷新最后运行时间（冷却从执行开始算起）
 	t.SetState(task.TaskRunning)
 	t.SetLastRun(time.Now())
@@ -224,6 +245,10 @@ func (s *Scheduler) executeTask(t *task.RuntimeTask) bool {
 
 	// 构建引擎执行
 	engine := task.NewPipelineEngine(t.Config())
+
+	// 绑定本任务的取消令牌：引擎各检查点、插件长循环（plugin.IsTaskCancelled）、
+	// 以及共享该令牌的子任务流水线，都看它 → 任务一结束"里面所有的程序"跟着停
+	plugin.SetCurrentCancel(engine.CancelToken())
 
 	// 任务开始前无条件清扫弹窗：反复扫到没有弹窗命中为止（弹窗连锁出现，单次扫不干净）。
 	// 自动调度(tick) 和手动触发(RunTaskNow) 都走 executeTask，所以两条路径都会清扫。
@@ -264,36 +289,77 @@ func (s *Scheduler) executeTask(t *task.RuntimeTask) bool {
 		doneCh <- engine.Execute(t.RunState())
 	}()
 
+	// 先判定走哪条结束路径，但**不在这里 return** —— 必须等引擎 goroutine 真正退出
+	var result *task.ExecResult
+	超时 := false
 	select {
 	case <-ctx.Done():
-		core.LogWithTimef("[Scheduler] %s 超时 (elapsed=%v)", t.Name(), time.Since(startTime))
+		超时 = true
+		// 通知引擎里的所有循环（引擎检查点 + 插件长循环 + 子任务流水线）尽快退出
+		engine.CancelToken().Store(true)
+		core.LogWithTimef("[Scheduler] %s 超时 (elapsed=%v) → 已发取消信号, 等待引擎退出",
+			t.Name(), time.Since(startTime))
+	case result = <-doneCh:
+	}
+
+	// ── 等引擎 goroutine 真正退出 ──
+	// 不管是完成/失败/超时哪种结束方式，都必须确认 engine.Execute 已经 return，
+	// 否则残留 goroutine 会继续操作屏幕，跟下一个任务的引擎互相干扰（就是"串台"）。
+	// doneCh 缓冲为 1，引擎跑完一定发得出来，不会因为这里没人收而卡住泄漏。
+	if result == nil {
+		等待开始 := time.Now()
+		tk := time.NewTicker(30 * time.Second)
+		defer tk.Stop()
+		已告警 := false
+		for result == nil {
+			select {
+			case result = <-doneCh:
+			case <-tk.C:
+				core.LogWithTimef("[Scheduler] %s 引擎仍未退出（已等%v）, 继续等待",
+					t.Name(), time.Since(等待开始).Round(time.Second))
+				if !已告警 && time.Since(等待开始) > 120*time.Second {
+					已告警 = true
+					core.LogWithTimef("[Scheduler] %s 引擎等待超时(120秒) 仍未退出 → 持续等待, 需人工处理", t.Name())
+					core.SetStatusColor("#FF5555", "%s 引擎未退出 → 等待人工处理", t.Name())
+				}
+			}
+		}
+		core.LogWithTimef("[Scheduler] %s 引擎已退出（等待%v）",
+			t.Name(), time.Since(等待开始).Round(time.Second))
+	}
+
+	// 引擎已彻底退出 → 解绑取消令牌 + 清空单飞锁。到此才允许跑下一个任务。
+	plugin.SetCurrentCancel(nil)
+	s.running = nil
+
+	if 超时 {
 		t.SetState(task.TaskFailed)
 		core.SetStatusColor("#FF5555", "%s 超时", t.Name())
 		if s.onTaskError != nil {
 			s.onTaskError(t, ctx.Err())
 		}
 		return false
-	case result := <-doneCh:
-		elapsed := time.Since(startTime).Round(time.Millisecond)
-		if result.Success {
-			core.LogWithTimef("[Scheduler] %s 完成 (elapsed=%v, steps=%d)",
-				t.Name(), elapsed, result.ExecutedSteps)
-			t.SetState(task.TaskCompleted)
-			core.SetStatusColor("#00FF00", "%s 完成 (%v)", t.Name(), elapsed)
-			if s.onTaskComplete != nil {
-				s.onTaskComplete(t)
-			}
-			return true
-		}
-		core.LogWithTimef("[Scheduler] %s 失败 (elapsed=%v, step=%s, err=%v)",
-			t.Name(), elapsed, result.LastStep, result.Error)
-		t.SetState(task.TaskFailed)
-		core.SetStatusColor("#FF5555", "%s 失败: %v", t.Name(), result.Error)
-		if s.onTaskError != nil {
-			s.onTaskError(t, result.Error)
-		}
-		return false
 	}
+
+	elapsed := time.Since(startTime).Round(time.Millisecond)
+	if result.Success {
+		core.LogWithTimef("[Scheduler] %s 完成 (elapsed=%v, steps=%d)",
+			t.Name(), elapsed, result.ExecutedSteps)
+		t.SetState(task.TaskCompleted)
+		core.SetStatusColor("#00FF00", "%s 完成 (%v)", t.Name(), elapsed)
+		if s.onTaskComplete != nil {
+			s.onTaskComplete(t)
+		}
+		return true
+	}
+	core.LogWithTimef("[Scheduler] %s 失败 (elapsed=%v, step=%s, err=%v)",
+		t.Name(), elapsed, result.LastStep, result.Error)
+	t.SetState(task.TaskFailed)
+	core.SetStatusColor("#FF5555", "%s 失败: %v", t.Name(), result.Error)
+	if s.onTaskError != nil {
+		s.onTaskError(t, result.Error)
+	}
+	return false
 }
 
 // logStatusSummary 每轮调度打印所有自动任务状态（执行中/冷却剩余/可执行），只打日志不影响调度

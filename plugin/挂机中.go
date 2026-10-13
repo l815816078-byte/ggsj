@@ -7,6 +7,10 @@ import (
 	"app/core"
 )
 
+// 子任务下次可跑 子任务冷却表（进程内）：跑完一个子任务按随机区间记下次可跑时间，没到就跳过。
+// 子任务不再走调度器(不写 RuntimeTask 的冷却/状态)，冷却只记在这张表里。
+var 子任务下次可跑 = map[string]time.Time{}
+
 func init() {
 	Register(&挂机中{})
 }
@@ -60,6 +64,10 @@ func (p *挂机中) Exec(ctx *Context) (string, error) {
 
 // 跑子任务 每轮随机顺序执行子任务（名称 + 冷却区间，秒，取区间随机值）；
 // 子任务耗时不算"没打怪"时间（跑完补回上次打怪时间）；有执行过则主动清一次任务轮转弹窗。
+//
+// 子任务只是"跑一遍该任务的流水线"（RunSubTask）：不参与调度、不写任务状态/冷却，
+// 就在本插件所在的 goroutine 里同步跑完；外层任务一结束（含超时），
+// 取消令牌置位后这里和子任务流水线内部都会在下一个检查点一起退出。
 func 跑子任务(ctx *Context) {
 	// 子任务期间不算"没打怪"时间：跑子任务前记时间，跑完把耗时补回到上次打怪时间上
 	子任务开始 := time.Now()
@@ -81,8 +89,16 @@ func 跑子任务(ctx *Context) {
 	rand.Shuffle(len(子任务), func(i, j int) { 子任务[i], 子任务[j] = 子任务[j], 子任务[i] })
 	执行过 := false
 	for _, t := range 子任务 {
-		if RunTask(t.名, t.冷最小+rand.Intn(t.冷最大-t.冷最小+1)) {
+		// 脚本停止 / 外层任务被取消 → 立刻停，不再往后跑子任务
+		if IsStopped() || IsTaskCancelled() {
+			break
+		}
+		if time.Now().Before(子任务下次可跑[t.名]) {
+			continue // 冷却未到 → 跳过
+		}
+		if RunSubTask(t.名) {
 			执行过 = true
+			子任务下次可跑[t.名] = time.Now().Add(time.Duration(t.冷最小+rand.Intn(t.冷最大-t.冷最小+1)) * time.Second)
 			core.RandomSleep(1000, 3000)
 		}
 	}

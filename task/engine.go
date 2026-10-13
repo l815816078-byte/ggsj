@@ -4,6 +4,7 @@ import (
 	"app/core"
 	"app/plugin"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +17,21 @@ type PipelineEngine struct {
 
 	started  time.Time // 任务开始时间（仅用于日志显示已用时间，不影响逻辑）
 	prevStep string    // 上一次进入 runNode 的步骤名（流转日志显示"上一步"，调试用）
+
+	// cancel 本引擎的取消令牌：调度器结束时置 true，引擎各检查点自查后退出。
+	// 每个引擎一个（不是全局），这样全量重启里的登录流程等临时引擎不受影响；
+	// 子任务引擎用 SetCancel 共享外层令牌，外层一停子任务跟着停。nil = 永不取消。
+	cancel *atomic.Bool
 }
+
+// CancelToken 取本引擎的取消令牌（调度器在任务开始时绑给 plugin，供插件自查用）
+func (e *PipelineEngine) CancelToken() *atomic.Bool { return e.cancel }
+
+// SetCancel 让本引擎共享另一个引擎的取消令牌（子任务流水线用：外层一停，子任务跟着停）
+func (e *PipelineEngine) SetCancel(p *atomic.Bool) { e.cancel = p }
+
+// IsCancelled 本引擎是否已被要求结束（引擎内各检查点自查用）
+func (e *PipelineEngine) IsCancelled() bool { return e.cancel != nil && e.cancel.Load() }
 
 // globalPopups 全局弹窗配置，所有引擎实例共享
 var globalPopups []StepConfig
@@ -56,6 +71,7 @@ func NewPipelineEngine(cfg TaskConfig) *PipelineEngine {
 		steps:   cfg.Steps,
 		stepIdx: idx,
 		popups:  popups,
+		cancel:  new(atomic.Bool), // 默认 false：不主动取消，由调度器结束时置 true
 	}
 }
 
@@ -79,8 +95,16 @@ func (e *PipelineEngine) Execute(rs *RunState) *ExecResult {
 	result := &ExecResult{}
 	idx := 0
 	for idx < len(e.steps) {
-		if plugin.IsStopped() {
+		if plugin.IsStopped() || e.IsCancelled() {
 			return &ExecResult{}
+		}
+		// 任务级 deadline：整任务时限已到就不再推进（runNode 进入前也会查一次，
+		// 这里再兜一道，防"跳转即 return"的路由把主循环架空）
+		if time.Now().After(deadline) {
+			return &ExecResult{
+				LastStep: e.steps[idx].Name,
+				Error:    fmt.Errorf("[%s] 任务超时", e.config.Name),
+			}
 		}
 		step := &e.steps[idx]
 		ctx.StepName = step.Name
@@ -194,6 +218,15 @@ func (e *PipelineEngine) HandlePopupsOnce() {
 func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx *plugin.Context, entry string) *ExecResult {
 	step := &e.steps[idx]
 
+	// 进入节点前先看任务级 deadline：整任务时限已过就直接收工，不再进入也不走失败跳转。
+	// 没有这一句，"StartUp ↔ 挂机中" 这类"跳转即 return"的路由每进一个新节点都会把
+	// tried 重置成 false，循环内那个 "tried && 超时" 永远进不去 → 任务实际永远不会超时。
+	// 放在进入处而不是循环里，也避免"超时失败跳转"在节点间来回跳形成递归。
+	if time.Now().After(deadline) {
+		core.LogWithTimef("[Engine] %s →【%s】任务最大执行秒已到 → 收工", e.config.Name, step.Name)
+		return &ExecResult{LastStep: step.Name, Error: fmt.Errorf("[%s] 任务超时", step.Name)}
+	}
+
 	// 节点超时截止时间
 	nodeDl := deadline
 	if step.Timeout > 0 {
@@ -214,7 +247,7 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 		step.Next)
 	e.prevStep = step.Name
 	for {
-		if rs.Interrupted || plugin.IsStopped() {
+		if rs.Interrupted || plugin.IsStopped() || e.IsCancelled() {
 			return &ExecResult{LastStep: step.Name}
 		}
 
@@ -323,7 +356,9 @@ func (e *PipelineEngine) runNode(idx int, rs *RunState, deadline time.Time, ctx 
 			// 识别失败 → 先扫一遍弹窗（识别不到通常是弹窗挡路），清掉就重试当前节点
 			core.LogWithTimef("[Engine] %s →【%s】未识别到 → 扫弹窗", e.config.Name, step.Name)
 			if e.checkPopups(rs, deadline, ctx) != nil {
-				if plugin.IsStopped() || time.Now().After(deadline) {
+				// 弹窗插件可能已经置了取消令牌（如"复活"判定当前任务该收工）→ 直接退出，
+				// 不再打"弹窗已清 → 重试当前节点"（那条日志会让人误以为还在正常重试）
+				if plugin.IsStopped() || e.IsCancelled() || time.Now().After(deadline) {
 					return &ExecResult{}
 				}
 				core.LogWithTimef("[Engine] %s →【%s】弹窗已清 → 重试当前节点", e.config.Name, step.Name)

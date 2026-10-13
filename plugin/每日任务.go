@@ -75,7 +75,7 @@ func (p *每日任务) Exec(ctx *Context) (string, error) {
 		}
 		core.LogWithTimef("[每日任务] 第%d个战力 命中坐标 %d,%d", i+1, pt.X, pt.Y)
 		// 点击该战力
-		core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+3, pt.Y+3)
+		core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+10, pt.Y+10)
 		// 点完再检测一下【/】(区域 857,142,1231,587)，只判断不做操作
 		if !core.Exec("/", 857, 142, 1231, 587).Found {
 			core.LogWithTimef("[每日任务] 第%d个战力 未检测到【/】(区域 857,142,1231,587) → 继续下一个", i+1)
@@ -124,7 +124,7 @@ func (p *每日任务) Exec(ctx *Context) (string, error) {
 						return "no", nil
 					}
 					// 点击该任务
-					core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+3, pt.Y+3)
+					core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+10, pt.Y+10)
 					// 点了之后点击【退出】→ 说明已做完/已在进行中，不用再检测进行中，继续点下一个
 					if CheckLoopClick("退出", 3*time.Second, 1*time.Second) {
 						core.LogWithTimef("[每日任务] 点击(%d,%d)后点击【退出】→ 继续点下一个", pt.X, pt.Y)

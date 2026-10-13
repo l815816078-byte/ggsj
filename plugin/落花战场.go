@@ -94,7 +94,7 @@ func (p *落花战场) Exec(ctx *Context) (string, error) {
 		return "no", nil
 	}
 	core.LogWithTimef("[落花战场] 选择频道【%s】→ 点击 (%d,%d)", 频道.名称, 频道.X, 频道.Y)
-	core.RandomClickInAreaWithDelay(频道.X, 频道.Y, 频道.X+3, 频道.Y+3)
+	core.RandomClickInAreaWithDelay(频道.X, 频道.Y, 频道.X+10, 频道.Y+10)
 
 	// 5) 点【花钱入场】
 	if !ClickRecog("花钱入场") {

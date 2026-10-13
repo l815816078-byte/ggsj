@@ -227,6 +227,16 @@ func GetRecogInt(name, key string) int {
 	return 0
 }
 
+// GetRecogBool 获取预设内布尔字段（JSON true/false）
+func GetRecogBool(name, key string) bool {
+	if cfg := GetRecog(name); cfg != nil {
+		if b, ok := cfg[key].(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
 // GetRecogArray 获取预设内数组字段
 func GetRecogArray(name, key string) []interface{} {
 	if cfg := GetRecog(name); cfg != nil {
