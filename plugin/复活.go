@@ -29,6 +29,8 @@ type 复活 struct{}
 func (p *复活) Name() string { return "复活" }
 
 func (p *复活) Exec(ctx *Context) (string, error) {
+	// 先做一次任务轮转弹窗清扫，再检测【复活】（复活可能被弹窗挡着识别不到）
+	ClearPopups()
 	if !ClickRecog("复活") {
 		return "no", nil
 	}

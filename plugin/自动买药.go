@@ -115,9 +115,9 @@ type 自动买药 struct{}
 func (p *自动买药) Name() string { return "自动买药" }
 
 func (p *自动买药) Exec(ctx *Context) (string, error) {
-	// 1) 检测是否缺药
-	if !core.Exec("是否缺药").Found {
-		core.LogWithTimef("[自动买药] 未检测到缺药 → 结束")
+	// 1) 检测是否缺药（6秒内每2秒检测一次，检测到就停）
+	if !CheckLoop("是否缺药", 6*time.Second, 2*time.Second) {
+		core.LogWithTimef("[自动买药] 6秒内未检测到缺药 → 结束")
 		return "ok", nil
 	}
 	core.LogWithTimef("[自动买药] 检测到缺药 → 开始去主城买药")

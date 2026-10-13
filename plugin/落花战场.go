@@ -191,20 +191,27 @@ func 选落花点位() (落花点位, bool) {
 //  2. 购买数量默认 1，配置 N 就再点 N-1 次【加1】
 //  3. 用【购买数量】取文字库读出数量文本，跟配置对上 → 点【确认】；对不上 → 点关闭(760,201,807,249)
 func 落花商店() {
+	物品列表 := GetScriptConfig().落花商店
+	core.LogWithTimef("[落花商店] 开始，脚本配置共 %d 个物品", len(物品列表))
 	if !ClickRecog("棕色按钮", 12, 637, 98, 703) {
-		core.LogWithTimef("[落花商店] 未识别到【棕色按钮】→ 结束")
+		core.LogWithTimef("[落花商店] 未识别到【棕色按钮】(区域 12,637,98,703) → 结束")
 		return
 	}
-	for _, 物品 := range GetScriptConfig().落花商店 {
+	core.LogWithTimef("[落花商店] 已点击【棕色按钮】→ 进入商店")
+	for n, 物品 := range 物品列表 {
 		if IsStopped() {
+			core.LogWithTimef("[落花商店] 脚本已停止 → 中断")
 			return
 		}
+		core.LogWithTimef("[落花商店] 第%d/%d 个物品【%s】，配置数量 %d", n+1, len(物品列表), 物品.物品名, 物品.数量)
 		找到 := false
 		for i := 1; i <= 3; i++ {
 			if IsStopped() {
+				core.LogWithTimef("[落花商店] 脚本已停止 → 中断")
 				return
 			}
 			if ClickRecog(物品.物品名) { // 偏移 118,2 在预设的"坐标偏移"里，Exec 已叠加，这里不要再传
+				core.LogWithTimef("[落花商店] 第%d次找到并点击【%s】", i, 物品.物品名)
 				找到 = true
 				break
 			}
@@ -215,21 +222,30 @@ func 落花商店() {
 			core.LogWithTimef("[落花商店] 滑动3次仍未找到【%s】→ 下一个物品", 物品.物品名)
 			continue
 		}
+		core.LogWithTimef("[落花商店] 【%s】数量默认 1，需要再点 %d 次【加1】", 物品.物品名, 物品.数量-1)
 		for i := 1; i < 物品.数量; i++ {
-			core.LogWithTimef("[落花商店] 【%s】点第%d次【加1】", 物品.物品名, i)
-			ClickRecog("加1")
+			core.LogWithTimef("[落花商店] 【%s】点第%d/%d次【加1】", 物品.物品名, i, 物品.数量-1)
+			if !ClickRecog("加1") {
+				core.LogWithTimef("[落花商店] 【%s】第%d次未识别到【加1】(区域 709,368,724,383)", 物品.物品名, i)
+			}
 		}
 		r := core.Exec("购买数量")
 		对上 := r.Found && r.Word == strconv.Itoa(物品.数量)
-		core.LogWithTimef("[落花商店] 【%s】购买数量读到(%s)，配置 %d → 对上=%t", 物品.物品名, r.Word, 物品.数量, 对上)
+		core.LogWithTimef("[落花商店] 【%s】购买数量读到(%s) 命中=%t，配置 %d → 对上=%t", 物品.物品名, r.Word, r.Found, 物品.数量, 对上)
 		if 对上 {
-			ClickRecog("确认")
+			core.LogWithTimef("[落花商店] 【%s】数量对上 → 点【确认】", 物品.物品名)
+			if !ClickRecog("确认") {
+				core.LogWithTimef("[落花商店] 【%s】未识别到【确认】", 物品.物品名)
+			}
 		} else {
 			core.LogWithTimef("[落花商店] 【%s】数量对不上 → 点击关闭 760,201,807,249", 物品.物品名)
 			core.RandomClickInAreaWithDelay(760, 201, 807, 249)
 		}
 	}
-	ClickRecog("回退")
+	core.LogWithTimef("[落花商店] 全部物品处理完 → 点【回退】")
+	if !ClickRecog("回退") {
+		core.LogWithTimef("[落花商店] 未识别到【回退】(区域 29,20,56,53)")
+	}
 }
 
 // 随机开启频道 在已开启的频道里随机选一个；没有已开启的 → ok=false

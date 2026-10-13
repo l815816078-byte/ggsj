@@ -2,6 +2,7 @@ package main
 
 import (
 	"app/bot"
+	"app/core"
 	"fmt"
 	"log"
 )
@@ -129,8 +130,8 @@ func main() {
 	// 到期提醒文本由 StartHeartbeat 在 HUD 初始化后显示。
 
 	// 热更新流程结束（已是最新），此时才初始化主 HUD，真机先不走hud 报错
-	/*core.InitHUD()
-	core.SetStatus("已启动，等待任务下发") // 青色状态*/
+	core.InitHUD()
+	core.SetStatus("已启动，等待任务下发") // 青色状态
 	/*core.RandomSleep(3000, 10000)*/
 
 	// 2. 创建 Bot
