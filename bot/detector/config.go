@@ -33,7 +33,7 @@ type PopupScene struct {
 	RecogRef   string   `json:"识别引用"` // 识别条件预设引用（assets/recogs.json），转换时自动合并
 	Type       string   `json:"类型"`   // "图片"(默认) / "文字" / "找色"
 	Text       string   `json:"识别文字"` // OCR 文字（类型=文字 时使用）
-	ColorMulti string   `json:"多点找色"` // 多点找色格式（类型=找色 时使用）
+	ColorMulti []string `json:"多点找色"` // 多点找色格式（类型=找色 时使用；数组，单个也写成一个元素）
 	Colors     []string `json:"颜色数组"` // 单点找色颜色数组（类型=找色 且 多点找色为空时使用）
 	Region     [4]int   `json:"截图区域"` // 截图区域 [x1,y1,x2,y2]，全为0=全屏
 	Sim        float64  `json:"相似度"`  // 该场景独立相似度（覆盖全局阈值），与 recogs.json 预设字段同名
@@ -63,7 +63,7 @@ func (l *PopupSceneList) UnmarshalJSON(data []byte) error {
 		// 如果全是空对象（旧格式字符串被错误解析），回退字符串解析
 		allEmpty := len(scenes) > 0
 		for _, s := range scenes {
-			if s.Name != "" || s.Type != "" || s.Text != "" || s.ColorMulti != "" {
+			if s.Name != "" || s.Type != "" || s.Text != "" || len(s.ColorMulti) > 0 {
 				allEmpty = false
 				break
 			}

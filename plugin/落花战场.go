@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"math/rand"
+	"strconv"
 	"time"
 
 	"app/core"
@@ -80,6 +81,9 @@ func (p *落花战场) Exec(ctx *Context) (string, error) {
 		core.LogWithTimef("[落花战场] 未找到【落花战场】→ 失败")
 		return "no", nil
 	}
+
+	// 2.5) 落花商店：点【棕色按钮】进商店 → 按脚本配置逐个买物品 → 回退
+	落花商店()
 
 	// 3) 点【黄色按钮】
 	if !ClickRecog("黄色按钮") {
@@ -178,6 +182,54 @@ func 选落花点位() (落花点位, bool) {
 		}
 	}
 	return 候选[rand.Intn(len(候选))], true
+}
+
+// 落花商店 点【棕色按钮】(区域 12,637,98,703) 打开商店 → 按脚本配置【落花商店】逐个买 → 最后点【回退】。
+//
+// 每个物品：
+//  1. 找它并点击（点不到就从下往上滑动 177,521 → 177,233，最多 3 次；3 次都找不到 → 换下一个物品）
+//  2. 购买数量默认 1，配置 N 就再点 N-1 次【加1】
+//  3. 用【购买数量】取文字库读出数量文本，跟配置对上 → 点【确认】；对不上 → 点关闭(760,201,807,249)
+func 落花商店() {
+	if !ClickRecog("棕色按钮", 12, 637, 98, 703) {
+		core.LogWithTimef("[落花商店] 未识别到【棕色按钮】→ 结束")
+		return
+	}
+	for _, 物品 := range GetScriptConfig().落花商店 {
+		if IsStopped() {
+			return
+		}
+		找到 := false
+		for i := 1; i <= 3; i++ {
+			if IsStopped() {
+				return
+			}
+			if ClickRecog(物品.物品名) { // 偏移 118,2 在预设的"坐标偏移"里，Exec 已叠加，这里不要再传
+				找到 = true
+				break
+			}
+			core.LogWithTimef("[落花商店] 第%d次未找到【%s】→ 从下往上滑动 177,521 → 177,233", i, 物品.物品名)
+			core.RandomSwipe(177, 521, 177, 233, 500, 2000)
+		}
+		if !找到 {
+			core.LogWithTimef("[落花商店] 滑动3次仍未找到【%s】→ 下一个物品", 物品.物品名)
+			continue
+		}
+		for i := 1; i < 物品.数量; i++ {
+			core.LogWithTimef("[落花商店] 【%s】点第%d次【加1】", 物品.物品名, i)
+			ClickRecog("加1")
+		}
+		r := core.Exec("购买数量")
+		对上 := r.Found && r.Word == strconv.Itoa(物品.数量)
+		core.LogWithTimef("[落花商店] 【%s】购买数量读到(%s)，配置 %d → 对上=%t", 物品.物品名, r.Word, 物品.数量, 对上)
+		if 对上 {
+			ClickRecog("确认")
+		} else {
+			core.LogWithTimef("[落花商店] 【%s】数量对不上 → 点击关闭 760,201,807,249", 物品.物品名)
+			core.RandomClickInAreaWithDelay(760, 201, 807, 249)
+		}
+	}
+	ClickRecog("回退")
 }
 
 // 随机开启频道 在已开启的频道里随机选一个；没有已开启的 → ok=false

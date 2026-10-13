@@ -160,8 +160,8 @@ func 装备处理(标签 string, 预设名 string, 需可觉醒 bool) {
 			}
 		}
 
-		// 最多循环 2 次
-		for i := 1; i <= 2; i++ {
+		// 最多循环 3 次
+		for i := 1; i <= 3; i++ {
 			if IsStopped() {
 				break
 			}
@@ -197,8 +197,8 @@ func 道术强化(标签 string) {
 		core.LogWithTimef("[成长] 【%s】点击红点(%d,%d)", 标签, pt.X, pt.Y)
 		core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+5, pt.Y+5)
 
-		// 最多循环 2 次
-		for i := 1; i <= 2; i++ {
+		// 最多循环 3 次
+		for i := 1; i <= 3; i++ {
 			if IsStopped() {
 				break
 			}

@@ -108,7 +108,7 @@ func ExecWithCache(name string, cacheKey string, ttl time.Duration, region ...in
 
 // ExecWithConfig 根据识别配置 map 执行识别（预设 / 临时构造的配置均可）
 // 预设字段 "返回中间坐标": true（默认 false = 返回原命中点）时，命中统一返回目标中间坐标：
-// 找字 / 模板图 / 透明图 → 命中块矩形中心；多点找色 / 多点找色数组无块边界 → 命中点即 first 色点坐标（居中不额外加偏移）；
+// 找字 / 模板图 / 透明图 → 命中块矩形中心；多点找色无块边界 → 命中点即 first 色点坐标（居中不额外加偏移）；
 // 单色点、OCR 取文 / 取文字库无目标块，命中点即目标点，坐标不变。
 // "坐标偏移"[dx,dy] 相对命中原始点(块左上角)叠加：单独配 = 左上角+偏移；
 // 与"返回中间坐标"同配时（仅找字/模板图/透明图这些有块边界的类型，见 centerOffsetMerged），
@@ -118,31 +118,8 @@ func ExecWithCache(name string, cacheKey string, ttl time.Duration, region ...in
 func ExecWithConfig(cfg map[string]interface{}, cacheArgs ...interface{}) *RecogResult {
 	x1, y1, x2, y2 := recogRegion(cfg)
 
-	// 1) 多点找色
-	if mc := recogString(cfg, "多点找色"); mc != "" {
-		first, rest := SplitMultiColor(mc)
-		sim := recogSim(cfg)
-		if sim <= 0 {
-			sim = 0.9
-		}
-		count := recogCount(cfg)
-		if count <= 0 {
-			count = 1
-		}
-		dir := recogInt(cfg, "找色方向")
-		if dir <= 0 {
-			dir = 1
-		}
-		x, y, ok := FindMultiColor(x1, y1, x2, y2, first, rest, sim, count, dir, cacheArgs...)
-		if !ok {
-			return &RecogResult{}
-		}
-		// 多点找色无块边界：命中点即 first 色点坐标（配"返回中间坐标"也不加偏移，first 点本身就在目标上）
-		return &RecogResult{X: x, Y: y, Sim: sim, Found: true, Type: "multicolor"}
-	}
-
-	// 1.5) 多点找色数组：逐个试，任一组合命中即返回（兼容一个预设配多组多点找色）
-	if mcs := recogArray(cfg, "多点找色数组"); len(mcs) > 0 {
+	// 1) 多点找色：字段值一律是字符串数组（单个组合也写成 ["..."]），逐个试、任一组合命中即返回
+	if mcs := recogArray(cfg, "多点找色"); len(mcs) > 0 {
 		sim := recogSim(cfg)
 		if sim <= 0 {
 			sim = 0.9
@@ -362,36 +339,8 @@ func ExecAll(name string, region ...int) []*RecogResult {
 func ExecAllWithConfig(cfg map[string]interface{}, cacheArgs ...interface{}) []*RecogResult {
 	x1, y1, x2, y2 := recogRegion(cfg)
 
-	// 1) 多点找色：返回全部命中点
-	if mc := recogString(cfg, "多点找色"); mc != "" {
-		first, rest := SplitMultiColor(mc)
-		sim := recogSim(cfg)
-		if sim <= 0 {
-			sim = 0.9
-		}
-		count := recogCount(cfg)
-		if count <= 0 {
-			count = 1
-		}
-		dir := recogInt(cfg, "找色方向")
-		if dir <= 0 {
-			dir = 1
-		}
-		pts := FindMultiColorAll(x1, y1, x2, y2, first, rest, sim, count, dir, cacheArgs...)
-		if len(pts) == 0 {
-			return nil
-		}
-		off := recogOffset(cfg, "坐标偏移")
-		// 多点找色无块边界：命中点即 first 色点坐标（配"返回中间坐标"也不加偏移）；"坐标偏移"仍在此叠加
-		results := make([]*RecogResult, 0, len(pts))
-		for _, p := range pts {
-			results = append(results, &RecogResult{X: p.X + off[0], Y: p.Y + off[1], Sim: sim, Found: true, Type: "multicolor"})
-		}
-		return results
-	}
-
-	// 1.5) 多点找色数组：返回全部组合的命中点（逐个组合 FindMultiColorAll 累加）
-	if mcs := recogArray(cfg, "多点找色数组"); len(mcs) > 0 {
+	// 1) 多点找色：返回全部组合的全部命中点（逐个组合 FindMultiColorAll 累加）
+	if mcs := recogArray(cfg, "多点找色"); len(mcs) > 0 {
 		sim := recogSim(cfg)
 		if sim <= 0 {
 			sim = 0.9
@@ -632,8 +581,8 @@ func centerOffsetMerged(cfg map[string]interface{}) bool {
 	if !recogBool(cfg, "返回中间坐标") {
 		return false
 	}
-	// 与 ExecWithConfig 类型优先级一致：多点找色/多点找色数组最先命中，无块边界 → 不并入
-	if recogString(cfg, "多点找色") != "" || len(recogArray(cfg, "多点找色数组")) > 0 {
+	// 与 ExecWithConfig 类型优先级一致：多点找色最先命中，无块边界 → 不并入
+	if len(recogArray(cfg, "多点找色")) > 0 {
 		return false
 	}
 	if len(recogArray(cfg, "模板图片")) > 0 || len(recogArray(cfg, "透明图")) > 0 {

@@ -76,7 +76,7 @@ type StepConfig struct {
 	Images          []string `json:"模板图片"`   // 模板图片名
 	Text            string   `json:"识别文字"`   // OCR 文字
 	Colors          []string `json:"颜色数组"`   // 颜色数组
-	ColorMulti      string   `json:"多点找色"`   // 多点找色格式
+	ColorMulti      []string `json:"多点找色"`   // 多点找色格式（数组，单个也写成一个元素）
 	Label           string   `json:"界面标签"`   // 界面标签（assets/scene.json 的 key）
 	Region          [4]int   `json:"截图区域"`   // 截图区域 [x1,y1,x2,y2]
 	IsStrictMode    bool     `json:"严格模式"`   // 严格模式

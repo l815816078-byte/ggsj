@@ -15,9 +15,10 @@ func init() {
 	Register(&挂机中{})
 }
 
-// 挂机中 插件：检测到"自动攻击开启中"即认为正在挂机中。
-// 挂机中顺带跑子任务（按顺序，冷却区间随机，避免每轮重复执行）；
-// 命中返回 "ok"（挂机中），没检测到返回 "no"。
+// 挂机中 插件：判断"是不是还在挂机" → "ok"（顺带跑子任务）/ "no"（不在挂机）/ "#done"（长时间无动静，收工）。
+// 每日任务：不判断【自动攻击开启中】，【任务进行中】命中、或 先命中【省电模式】再命中【/】即算挂机中。
+// 其他任务：【自动攻击开启中】是前提（没开就直接不在挂机）；在此基础上【怪物】命中 或【省电_金币】文字有变化 = 有动静，
+// 两者共用同一计时（任一有动静都刷新），100 秒都没动静 → 不算挂机。
 type 挂机中 struct{}
 
 func (p *挂机中) Name() string { return "挂机中" }
@@ -29,25 +30,46 @@ func (p *挂机中) Exec(ctx *Context) (string, error) {
 		return "no", nil
 	}
 
-	// 每日任务类型：不判断自动攻击开启中，只判断【任务进行中】【怪物】【省电_金币】三种
+	// 每日任务类型：不判断【自动攻击开启中】。
+	// 挂机中 =【任务进行中】命中；或 先检测到【省电模式】、再检测到【/】
 	if ctx.TaskName == "每日任务" {
-		if 刷新并超时(ctx, "每日任务", core.Exec("任务进行中").Found || core.Exec("怪物").Found || core.Exec("省电_金币").Found) {
+		挂机中 := core.Exec("任务进行中").Found
+		core.LogWithTimef("[挂机中] 每日任务：【任务进行中】命中=%t", 挂机中)
+		if !挂机中 && core.Exec("省电模式").Found {
+			core.LogWithTimef("[挂机中] 每日任务：检测到【省电模式】→ 检测【/】")
+			挂机中 = core.Exec("/").Found
+			core.LogWithTimef("[挂机中] 每日任务：【/】命中=%t", 挂机中)
+		}
+		if 刷新并超时(ctx, "每日任务", 挂机中) {
 			return "#done", nil
 		}
-		core.LogWithTimef("[挂机中] 每日任务进行中 → 正在挂机")
 		睡眠不计时(ctx)
 		跑子任务(ctx)
 		return "ok", nil
 	}
 
-	// 没开启自动攻击 → 不在挂机：清掉打怪计时（去自动攻击的时间不算，回来重新从 0 计）
+	// 没开启自动攻击 → 不在挂机：清掉打怪计时和金币文本（去自动攻击的时间不算，回来重新从 0 计，
+	// 金币也重记，否则下次回来第一次读到的金币跟离开前一样 → 判不出"有变化"）
 	if !core.Exec("自动攻击开启中").Found {
+		core.LogWithTimef("[挂机中] 未检测到【自动攻击开启中】→ 不在挂机；清掉打怪计时与金币文本，回来从 0 重新计 → no")
 		delete(ctx.Global, "上次打怪时间")
+		delete(ctx.Global, "上次金币文本")
 		return "no", nil
 	}
-
-	// 检测到【怪物】→ 刷新打怪时间；超过 100 秒没打怪 → 结束整个任务
-	if 刷新并超时(ctx, "", core.Exec("怪物").Found) {
+	// 有动静 =【怪物】命中 或【省电_金币】读到的文字与上次不同；两者共用同一个计时（任一有动静都刷新），
+	// 100 秒都没动静（没打怪、金币也不变）→ 不算挂机，结束整个任务
+	有动静 := core.Exec("怪物").Found
+	core.LogWithTimef("[挂机中] 【怪物】命中=%t", 有动静)
+	if r := core.Exec("省电_金币"); r.Found && r.Word != "" {
+		core.LogWithTimef("[挂机中] 【省电_金币】读到(%s)", r.Word)
+		if 上次金币, _ := ctx.Global["上次金币文本"].(string); r.Word != 上次金币 {
+			ctx.Global["上次金币文本"] = r.Word
+			有动静 = true
+			core.LogWithTimef("[挂机中] 【省电_金币】有变化(%s → %s) → 刷新计时", 上次金币, r.Word)
+		}
+	}
+	core.LogWithTimef("[挂机中] 本轮有动静=%t", 有动静)
+	if 刷新并超时(ctx, "", 有动静) {
 		return "#done", nil
 	}
 	core.LogWithTimef("[挂机中] 检测到自动攻击开启中 → 正在挂机")
@@ -99,7 +121,7 @@ func 跑子任务(ctx *Context) {
 		if RunSubTask(t.名) {
 			执行过 = true
 			子任务下次可跑[t.名] = time.Now().Add(time.Duration(t.冷最小+rand.Intn(t.冷最大-t.冷最小+1)) * time.Second)
-			core.RandomSleep(1000, 3000)
+			core.RandomSleep(3000, 20000)
 		}
 	}
 	ctx.Global["上次打怪时间"] = ctx.Global["上次打怪时间"].(time.Time).Add(time.Since(子任务开始))

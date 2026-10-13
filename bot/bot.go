@@ -123,6 +123,7 @@ func (b *Bot) Init() error {
 	// 与 RunTask 的区别：不走调度器、不写任务状态/冷却/HUD，只在调用方(外层任务)的
 	// goroutine 里同步跑完；并共享外层任务的取消令牌，外层一结束子任务立刻跟着停。
 	// 只是复用 JSON 的步骤轮转 + 流水线内嵌弹窗能力，不把它当"任务"。
+	// 与正式任务一样：开始前先做一次任务轮转弹窗清扫（子任务也会被弹窗挡住）。
 	plugin.SetRunSubTaskFunc(func(name string) bool {
 		t := b.loader.Get(name)
 		if t == nil {
@@ -131,6 +132,10 @@ func (b *Bot) Init() error {
 		}
 		engine := task.NewPipelineEngine(t.Config())
 		engine.SetCancel(plugin.CurrentCancel()) // 共享外层任务的取消令牌
+		sweepStart := time.Now()
+		swept := engine.ClearAllPopups(0)
+		core.LogWithTimef("[Bot] 子任务'%s' 弹窗清扫 %d 次, 耗时 %v",
+			name, swept, time.Since(sweepStart).Round(time.Millisecond))
 		r := engine.Execute(&task.RunState{ExecutedCounts: make(map[string]int)})
 		return r.Error == nil
 	})
