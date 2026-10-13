@@ -44,6 +44,7 @@ type PopupScene struct {
 	ClickArea   [4]int `json:"点击区域"` // 绝对点击区域 [x1,y1,x2,y2]，不为空时忽略其他，固定点这个区域
 	ClickOffset [2]int `json:"点击偏移"` // 相对检测位置的位移 [dx,dy]。如 OCR 找到文字在 (500,300)，偏移 [0,200] 则点 (500,500)
 	WaitAfter   int    `json:"等待秒"`  // 点击后等待，秒；0=不等（引擎用毫秒，转换时乘1000）
+	ClickDelay  *int   `json:"点击延迟秒"` // 点击动作点击后的固定延迟，秒；不写=nil=走默认延迟(随机1.5~2秒)；写0=点击后零延迟
 	Plugin     bool   `json:"插件模式"` // 插件模式：走插件处理，忽略识别/动作字段；名称即插件注册名（如"弹窗_判断等级复活"）
 	Action     string `json:"动作"`   // 点击(默认) / 滑动。空=点击，旧配置不写即沿用点击
 	SwipeStart [2]int `json:"滑动起点"` // 绝对滑动起点 [x,y]（动作=滑动 时使用）

@@ -40,7 +40,7 @@ func (p *画册) Exec(ctx *Context) (string, error) {
 			break
 		}
 		core.LogWithTimef("[画册] 外层红点(%d,%d) → 点击", op.X, op.Y)
-		core.RandomClickInAreaWithDelay(op.X, op.Y, op.X+10, op.Y+10)
+		core.RandomClickInAreaWithDelay(op.X, op.Y, op.X+5, op.Y+5)
 
 		// 内层 for：最多滑动 5 次结束
 		for i := 1; i <= 5; i++ {
@@ -54,7 +54,7 @@ func (p *画册) Exec(ctx *Context) (string, error) {
 					break
 				}
 				core.LogWithTimef("[画册] 内层红点(%d,%d) → 点击", ip.X, ip.Y)
-				core.RandomClickInAreaWithDelay(ip.X, ip.Y, ip.X+10, ip.Y+10)
+				core.RandomClickInAreaWithDelay(ip.X, ip.Y, ip.X+5, ip.Y+5)
 				ClickAdaptive(2000, 1000, nil,
 					btn("确认"),
 					btn("绿色按钮", 978, 583, 1054, 649),

@@ -283,7 +283,7 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 			core.LogWithTimef("[Plugin] 点击【%s】(%d,%d)", btns[i].Name, clickX, clickY)
 			// 点击自带的"点击后延时"不计入超时预算：测出本次点击耗时，补回 deadline
 			t0 := time.Now()
-			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+10, clickY+10)
+			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
 			deadline = deadline.Add(time.Since(t0))
 			if onHit != nil {
 				onHit(btns[i].Name)

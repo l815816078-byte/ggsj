@@ -13,15 +13,15 @@ func init() {
 
 // 地点 一个城市下的地点：名称 + 战力门槛 + 商店类型（可选）
 type 地点 struct {
-	名称   string
+	名称     string
 	战力门槛 int
 	商店类型 string // 商店类型名（可选；空 = 不需要点商店类型）
 }
 
 // 地图配置 通用配置（配置好主城/地点数组）
 type 地图配置 struct {
-	主城名  string // 主城名（recogs/字库预设名）
-	地点列表 []地点   // 该主城下的地点数组
+	主城名   string // 主城名（recogs/字库预设名）
+	地点列表 []地点 // 该主城下的地点数组
 }
 
 // 地图配置表 可配多个城市（用时指定"哪个主城下的哪个地点"）
@@ -99,10 +99,10 @@ var (
 )
 
 const (
-	列表滑动时长  = 2000
-	主城最多找   = 2 // 主城循环最多找几次
+	列表滑动时长   = 2000
+	主城最多找     = 2 // 主城循环最多找几次
 	折叠开最多滑动 = 3 // 折叠开循环里最多滑动次数
-	地点最多滑动  = 6 // 找地点时最多滑动次数（参考野外挂机）
+	地点最多滑动   = 6 // 找地点时最多滑动次数（参考野外挂机）
 )
 
 // 自动买药 插件：检测缺药 → 去主城 → 找地点 → 点商店类型 → 走传送那套。
@@ -180,7 +180,7 @@ func 买药() {
 		if IsStopped() {
 			return
 		}
-		if ClickRecog("药店npc", 238, 53, 960, 627) {
+		if ClickRecog("药店npc") {
 			找到 = true
 			core.RandomSleep(3000, 6000)
 			break
@@ -238,7 +238,7 @@ func 去地图(配置 地图配置, 目标地点 地点) bool {
 			} else {
 				// 没检测到折叠开 → 点击主城展开
 				core.LogWithTimef("[去地图] 第%d次找到主城【%s】%d,%d → 点开", i, 配置.主城名, r.X, r.Y)
-				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
+				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+5, r.Y+5)
 			}
 			找到主城 = true
 			break
@@ -253,7 +253,7 @@ func 去地图(配置 地图配置, 目标地点 地点) bool {
 			f := core.Exec("折叠开", 地图列表区域[:]...)
 			if f.Found {
 				core.LogWithTimef("[去地图] 折叠开第%d次找到【折叠开】%d,%d → 点击", j, f.X, f.Y)
-				core.RandomClickInAreaWithDelay(f.X, f.Y, f.X+10, f.Y+10)
+				core.RandomClickInAreaWithDelay(f.X, f.Y, f.X+3, f.Y+3) //不能太大范围不然点不到
 				core.RandomSleep(500, 1000)
 				continue
 			}
@@ -284,7 +284,7 @@ func 去地点(配置 地图配置, 目标地点 地点) bool {
 		r := core.Exec(目标地点.名称, 地图列表区域[:]...)
 		if r.Found {
 			core.LogWithTimef("[自动买药] 第%d次找到地点【%s】%d,%d → 点击", i, 目标地点.名称, r.X, r.Y)
-			core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
+			core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+5, r.Y+5)
 			找到 = true
 			break
 		}

@@ -22,8 +22,8 @@ type 成长子分类 struct {
 
 // 成长类型：名称 + 入口识别引用（空 = 默认就在该类型，不点击切换）+ 子分类列表
 type 成长类型 struct {
-	名称  string
-	入口  string
+	名称   string
+	入口   string
 	子分类 []成长子分类
 }
 
@@ -51,7 +51,7 @@ var 成长类型列表 = []成长类型{
 		入口: "成长道术",
 		子分类: []成长子分类{
 			{名称: "强化", 识别: "强化", 方法: func() { 道术强化("道术-强化") }}, // 默认选中
-			{名称: "觉醒", 识别: "觉醒", 方法: nil},                      // 留空
+			{名称: "觉醒", 识别: "觉醒", 方法: nil},                              // 留空
 		},
 	},
 }
@@ -149,7 +149,7 @@ func 装备处理(标签 string, 预设名 string, 需可觉醒 bool) {
 			break
 		}
 		core.LogWithTimef("[成长] 【%s】(需可觉醒=%v) 点击(%d,%d)", 标签, 需可觉醒, pt.X, pt.Y)
-		core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+10, pt.Y+10)
+		core.RandomClickInAreaWithDelay(pt.X, pt.Y, pt.X+5, pt.Y+5)
 
 		// 点开后再点一下【可觉醒】
 		if 需可觉醒 {
@@ -169,7 +169,7 @@ func 装备处理(标签 string, 预设名 string, 需可觉醒 bool) {
 			if r := core.Exec("确定花钱"); r.Found {
 				core.LogWithTimef("[成长] 【%s】第%d次 检测到【确定花钱】(%d,%d) → 点【棕色按钮】(区域 297,619,353,700)", 标签, i, r.X, r.Y)
 				ClickRecog("棕色按钮", 297, 619, 353, 700)
-				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
+				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X, r.Y)
 				core.LogWithTimef("[成长] 【%s】第%d次 已点击【确定花钱】(%d,%d)", 标签, i, r.X, r.Y)
 			} else {
 				core.LogWithTimef("[成长] 【%s】第%d次未检测到【确定花钱】", 标签, i)
@@ -206,7 +206,7 @@ func 道术强化(标签 string) {
 			if r := core.Exec("确定花钱"); r.Found {
 				core.LogWithTimef("[成长] 【%s】第%d次 检测到【确定花钱】(%d,%d) → 点【棕色按钮】(区域 297,619,353,700)", 标签, i, r.X, r.Y)
 				ClickRecog("棕色按钮", 297, 619, 353, 700)
-				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+10, r.Y+10)
+				core.RandomClickInAreaWithDelay(r.X, r.Y, r.X+5, r.Y+5)
 				core.LogWithTimef("[成长] 【%s】第%d次 已点击【确定花钱】(%d,%d)", 标签, i, r.X, r.Y)
 			} else {
 				core.LogWithTimef("[成长] 【%s】第%d次未检测到【确定花钱】", 标签, i)

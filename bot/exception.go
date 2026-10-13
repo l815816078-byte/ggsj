@@ -182,6 +182,11 @@ func convertPopupScenesToSteps(cfg *detector.PopupConfig) []task.StepConfig {
 			SwipeDuration: s.SwipeDur,
 			WaitAfter:   s.WaitAfter * 1000, // 秒 → 毫秒（引擎直接用毫秒）
 		}
+		// 点击延迟：JSON 配秒，运行时转毫秒；不写=nil=保持默认延迟（随机1.5~2秒）
+		if s.ClickDelay != nil {
+			毫秒 := *s.ClickDelay * 1000
+			sc.ClickDelay = &毫秒
+		}
 
 		// 动作：默认点击，显式配"滑动"才走滑动（如省电模式需滑动关闭）
 		sc.Action = s.Action
