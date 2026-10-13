@@ -135,16 +135,27 @@ func (e *PipelineEngine) Execute(rs *RunState) *ExecResult {
 //
 // 扫的是 detectors.json「任务轮转」段（taskRotatePopups），与流水线内嵌的弹窗列表独立。
 //
+// skip 本次不清的弹窗名单（按"名称"或"识别引用"匹配，留空=全清）。
+// 用于"这个场景下某某弹窗是正常界面元素，不能点"的场合，
+// 例如落花战场在副本里挂机，屏幕上常驻【退出副本】，清掉会把人从副本踢出去。
+//
 // 为什么要循环：sweepOnce 命中第一个就返回（一次只处理一个），而弹窗是连锁出现的 ——
 // 点掉"获得物品"结果弹窗 → 底下露出"等级提升" → 再点掉 → 可能还有，
 // 所以要一直扫到某轮全部未命中（说明清干净了）为止。屏幕干净时只跑 1 轮就结束。
-func (e *PipelineEngine) ClearAllPopups(maxRounds int) int {
+func (e *PipelineEngine) ClearAllPopups(maxRounds int, skip ...string) int {
 	if maxRounds <= 0 {
 		maxRounds = popupSweepMaxRounds
 	}
 	if len(taskRotatePopups) == 0 {
 		core.LogWithTimef("[Engine] 任务轮转弹窗列表为空 → 跳过清扫")
 		return 0
+	}
+	ban := make(map[string]bool, len(skip))
+	for _, s := range skip {
+		ban[s] = true
+	}
+	if len(ban) > 0 {
+		core.LogWithTimef("[Engine] 本次清扫跳过: %v", skip)
 	}
 	exclude := make(map[string]bool)
 	hitCount := make(map[string]int)
@@ -155,7 +166,7 @@ func (e *PipelineEngine) ClearAllPopups(maxRounds int) int {
 		if plugin.IsStopped() || time.Now().After(deadline) {
 			break
 		}
-		hit := e.sweepOnce(exclude)
+		hit := e.sweepOnce(exclude, ban)
 		if hit == "" {
 			break // 本轮无一命中 → 已清干净
 		}
@@ -174,13 +185,14 @@ func (e *PipelineEngine) ClearAllPopups(maxRounds int) int {
 
 // sweepOnce 扫一遍任务轮转列表，命中第一个就执行动作并返回其名称；全部未命中返回空串
 // exclude: 本次清扫内需要跳过的弹窗项（ClearAllPopups 的单项保底用）
-func (e *PipelineEngine) sweepOnce(exclude map[string]bool) string {
+// ban: 调用方指定要跳过的弹窗项（按名称或识别引用匹配，本次清扫全程有效）
+func (e *PipelineEngine) sweepOnce(exclude map[string]bool, ban map[string]bool) string {
 	for i := range taskRotatePopups {
 		if plugin.IsStopped() {
 			return ""
 		}
 		p := &taskRotatePopups[i]
-		if exclude[p.Name] {
+		if exclude[p.Name] || ban[p.Name] || ban[p.RecogRef] {
 			continue
 		}
 		var r *core.RecogResult

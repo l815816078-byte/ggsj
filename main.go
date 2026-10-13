@@ -5,6 +5,8 @@ import (
 	"app/core"
 	"fmt"
 	"log"
+
+	"github.com/Dasongzi1366/AutoGo/https"
 )
 
 // 版本号在 assets/default.json 的 version 字段（core.Version），发布新版时改 json 里的值即可。
@@ -128,7 +130,8 @@ func main() {
 
 	// 卡密激活/校验：公钥已在 main() 开头注入（见上方步骤 0），这里直接进入激活流程。
 	// 到期提醒文本由 StartHeartbeat 在 HUD 初始化后显示。
-
+	code, data := https.Get("http://127.0.0.1:8989/float?x=0&y=623", 500)
+	fmt.Printf("[HTTP测试] code=%d data=%s\n", code, string(data))
 	// 热更新流程结束（已是最新），此时才初始化主 HUD，真机先不走hud 报错
 	core.InitHUD()
 	core.SetStatus("已启动，等待任务下发") // 青色状态

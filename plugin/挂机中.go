@@ -24,9 +24,6 @@ type 挂机中 struct{}
 func (p *挂机中) Name() string { return "挂机中" }
 
 func (p *挂机中) Exec(ctx *Context) (string, error) {
-	// 先做一次任务轮转弹窗清扫，再检测【复活】（复活可能被弹窗挡着识别不到）
-	ClearPopups()
-
 	// 先检测【复活】：命中就点它（复活），本轮不跑子任务，交回路由器
 	if ClickRecog("复活") {
 		core.LogWithTimef("[挂机中] 检测到【复活】→ 已点击")

@@ -248,26 +248,34 @@ func ResetTaskCooldown(taskName string) bool {
 
 var (
 	clearPopupsMu sync.RWMutex
-	clearPopupsFn func() int
+	clearPopupsFn func(skip ...string) int
 )
 
 // SetClearPopupsFunc 注入"清一次任务轮转弹窗"的实现（由 bot 在 Init 时调用）
-func SetClearPopupsFunc(fn func() int) {
+func SetClearPopupsFunc(fn func(skip ...string) int) {
 	clearPopupsMu.Lock()
 	clearPopupsFn = fn
 	clearPopupsMu.Unlock()
 }
 
 // ClearPopups 主动做一次任务轮转弹窗清扫（扫到没有弹窗命中为止），返回处理次数。
+// skip: 本次不清的弹窗名单（按"名称"或"识别引用"匹配，留空=全清）。
+// 空串会被过滤掉，调用方可以无条件把"可选的跳过项"传进来。
 // 未注入实现（如单元测试/未走 bot 启动流程）时返回 0，不会 panic。
-func ClearPopups() int {
+func ClearPopups(skip ...string) int {
+	实跳 := skip[:0]
+	for _, s := range skip {
+		if s != "" {
+			实跳 = append(实跳, s)
+		}
+	}
 	clearPopupsMu.RLock()
 	fn := clearPopupsFn
 	clearPopupsMu.RUnlock()
 	if fn == nil {
 		return 0
 	}
-	return fn()
+	return fn(实跳...)
 }
 
 // ---------- 触发全量重启（依赖反转）----------

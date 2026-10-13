@@ -12,8 +12,8 @@ package plugin
 // JSON 键名本身靠 `json:"中文"` tag 映射, 所以字段名可随意, 但绝不能用中文首字符
 // (中文字符不属于 Unicode 大写字母, Go 视为未导出, json 包会静默丢弃该字段)。
 //
-// 新增一项的步骤: ①脚本配置.json 加 { "_说明":..., "值":... }
-// ②下面 scriptConfig 结构加对应字段 ③加一个取值函数 ④Go 里 var X = scriptXxx()
+// 新增一项的步骤: ①脚本配置.json 加字段 ②下面 scriptConfig 结构加对应字段
+// ③加一个取值函数 ④Go 里 var X = scriptXxx()
 
 import (
 	"encoding/json"
@@ -25,16 +25,16 @@ import (
 // scriptConfigFile 脚本配置.json 的文件名(嵌在 assets 里)
 const scriptConfigFile = "脚本配置.json"
 
-// scriptConfig 脚本配置.json 的整体结构。
-// 每项都是 { "_说明": ..., "值": ... } 的形式: "_说明" 只给人看, 代码只读 "值"。
+// scriptConfig 脚本配置.json 的整体结构（字段名用导出名，JSON 键靠 tag 映射）
 type scriptConfig struct {
-	DrugLimit struct {
-		Val int `json:"值"`
-	} `json:"药品下限"`
+	// 药品下限：当前药品数量低于该值就买药
+	DrugLimit int `json:"药品下限"`
 
-	FlowerShop struct {
-		Val []scriptFlowerShopItem `json:"值"`
-	} `json:"落花商店"`
+	// 副本：任务名列表，这些任务跑在副本里（挂机时不能清【退出副本】，否则会被踢出副本）
+	Dungeons []string `json:"副本"`
+
+	// 落花商店：要买的物品列表（按顺序买）
+	FlowerShop []scriptFlowerShopItem `json:"落花商店"`
 }
 
 // scriptFlowerShopItem 落花商店要买的一个物品
@@ -67,14 +67,26 @@ func loadScriptConfig() scriptConfig {
 
 // scriptDrugLimit 药品下限(只认 JSON): 没配/0 → 调用方用默认 50
 func scriptDrugLimit() int {
-	return scriptCfg.DrugLimit.Val
+	return scriptCfg.DrugLimit
+}
+
+// ───── 副本 ─────
+
+// isDungeonTask 判断任务是不是副本任务（任务名在"副本"名单里就算）
+func isDungeonTask(taskName string) bool {
+	for _, name := range scriptCfg.Dungeons {
+		if name == taskName {
+			return true
+		}
+	}
+	return false
 }
 
 // ───── 落花商店 ─────
 
 // scriptFlowerShop 落花商店物品名单(只认 JSON): 没配/空 = 不买任何东西
 func scriptFlowerShop() []scriptFlowerShopItem {
-	c := scriptCfg.FlowerShop.Val
+	c := scriptCfg.FlowerShop
 	if len(c) == 0 {
 		core.LogWithTimef("[脚本配置] '落花商店' 没配 → 落花商店不买任何物品")
 	}

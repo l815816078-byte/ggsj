@@ -39,10 +39,15 @@ func (p *自动攻击) Exec(ctx *Context) (string, error) {
 		core.LogWithTimef("[自动攻击] 未开启 → 点击自动攻击")
 		// 连按钮都识别不到，多半是被弹窗挡住了 → 清一次任务轮转弹窗再试。
 		// 只清一次：清扫本身要几秒，每轮都清会把 10 秒预算吃光，反而开不了自动攻击。
+		// 副本任务（脚本配置里的"副本"名单）例外：界面上常驻【退出副本】，清掉会被踢出副本
 		if !ClickRecog("自动攻击") && !已清弹窗 {
 			已清弹窗 = true
-			core.LogWithTimef("[自动攻击] 未识别到【自动攻击】→ 清一次任务轮转弹窗再试")
-			ClearPopups()
+			跳过 := ""
+			if isDungeonTask(ctx.TaskName) {
+				跳过 = "退出副本"
+			}
+			core.LogWithTimef("[自动攻击] 未识别到【自动攻击】→ 清一次任务轮转弹窗再试（副本任务跳过【退出副本】=%t）", 跳过 != "")
+			ClearPopups(跳过)
 		}
 		core.RandomSleep(1000, 1000)
 	}
