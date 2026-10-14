@@ -16,6 +16,13 @@ import (
 // 进商店检测"购买完成"实际判定，命中后全局置位，之后不再检测（见 plugin/检测交易行开启.go）。
 
 func main() {
+	// ==================== 加护口袋 多点找色测试 ====================
+	/*	{
+		imageHandler.SetDict("ziku.txt", "library")
+		r := core.Exec("加护口袋")
+		fmt.Printf("[加护口袋测试] Found=%v 命中=(%d,%d)\n", r.Found, r.X, r.Y)
+		select {}
+	}*/
 	// ==================== 每日任务 ExecAll 多结果测试 ====================
 	/*	imageHandler.SetDict("ziku.txt", "library")
 		pts := core.ExecAll("每日任务", 929, 99, 981, 371)

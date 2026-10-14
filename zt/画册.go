@@ -70,9 +70,10 @@ func 画册跑() {
 			return
 		}
 		画册滑动次数++
+		m := 滑动表["画册列表"]
 		cx := (604 + 664) / 2
-		core.LogWithTimef("[画册] 从下往上滑动 (%d,%d)→(%d,%d) 第%d次", cx, 453, cx, 315, 画册滑动次数)
-		core.RandomSwipe(cx, 453, cx, 315, 1500)
+		core.LogWithTimef("[画册] 从下往上滑动 (%d,%d)→(%d,%d) 第%d次", cx, m[1], cx, m[3], 画册滑动次数)
+		core.RandomSwipe(cx, m[1], cx, m[3], m[4])
 		return
 	}
 

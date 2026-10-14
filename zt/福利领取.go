@@ -90,11 +90,13 @@ func 翻页点红点() {
 		}
 		福利翻页次数++
 		if 福利翻页次数 <= 3 {
+			m := 滑动表["福利天数"]
 			core.LogWithTimef("[福利领取] 从下往上翻页 %d/3", 福利翻页次数)
-			core.RandomSwipe(594, 557, 594, 357, 1500)
+			core.RandomSwipe(m[0], m[1], m[2], m[3], m[4])
 		} else {
+			m := 滑动表["福利天数"]
 			core.LogWithTimef("[福利领取] 从上往下翻页 %d/3", 福利翻页次数-3)
-			core.RandomSwipe(594, 357, 594, 557, 1000)
+			core.RandomSwipe(m[3], m[2], m[1], m[0], 1000)
 		}
 		扫红点区域(373, 311, 950, 641)
 		return
@@ -108,8 +110,9 @@ func 翻页点红点() {
 			return
 		}
 		福利翻页次数++
+		m := 滑动表["福利积分"]
 		core.LogWithTimef("[福利领取] 从下往上翻页 %d/6", 福利翻页次数)
-		core.RandomSwipe(1062, 547, 1064, 407, 1500)
+		core.RandomSwipe(m[0], m[1], m[2], m[3], m[4])
 		扫红点区域(968, 353, 1066, 639)
 		return
 	}

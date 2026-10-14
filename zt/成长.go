@@ -243,9 +243,10 @@ func 道术强化(标签 string) {
 		成长第几次++
 		if 成长第几次 >= 3 {
 			// 3 次花完 → 从下往上滑一次，再下一件
+			m := 滑动表["成长列表"]
 			cx := (1021 + 1082) / 2
-			core.LogWithTimef("[成长] 【%s】从下往上滑动 (%d,%d)→(%d,%d)", 标签, cx, 589, cx, 263)
-			core.RandomSwipe(cx, 589, cx, 263, 1500)
+			core.LogWithTimef("[成长] 【%s】从下往上滑动 (%d,%d)→(%d,%d)", 标签, cx, m[1], cx, m[3])
+			core.RandomSwipe(cx, m[1], cx, m[3], m[4])
 			成长第几件++
 			成长第几次 = 0
 		}

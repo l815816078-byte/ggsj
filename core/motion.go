@@ -161,7 +161,7 @@ func RandomClickInAreaWithDelay(x1, y1, x2, y2 int, delay ...int) {
 	// 先执行点击
 	RandomClickInArea(x1, y1, x2, y2)
 	// 点击后随机延迟
-	minDelay, maxDelay := 2000, 2500
+	minDelay, maxDelay := 1500, 2000
 	switch len(delay) {
 	case 1:
 		minDelay, maxDelay = delay[0], delay[0]

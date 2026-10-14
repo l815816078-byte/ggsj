@@ -42,6 +42,7 @@ func 已停止() bool { return 停止.Load() }
 // 识别类型按字段自动选，顺序同 core.ExecWithConfig：
 //
 //	多点找色 → 模板图片 → 透明图 → 取文 → 取文字库 → 找字 → 颜色数组
+//
 // 本轮有命中 本轮是否有过识别命中（主流程用它做"卡死检测"：连续多轮没命中就重置）
 var 本轮有命中 = false
 
@@ -307,31 +308,55 @@ func 查找点击延时(名 string, 区域延时 ...int) bool {
 	return true
 }
 
-// 扫弹窗（= 老脚本 `_表找色点击`）：扫一遍名单，**命中就处理**。
-// 老脚本是"一轮把整张表扫完、所有命中的都点掉"（BaseClass.lua:70-86 没有 break），
-// 这里照抄，不 break。
+// 扫弹窗（= 老脚本 `_表找色点击`）：扫名单，**命中就处理**。
+// 一轮把整张表扫完、所有命中的都点掉（BaseClass.lua:70-86 没有 break），这里照抄，不 break。
 //
 // 默认动作 = 点击；名字在 滑动表 里的 → 改成滑动（如"省电模式"）。
 // 延时靠 `点击`（自带）和 `RandomSwipe` 的滑后延时参数，不在外面再加 sleep。
+//
+// 轮数：可选参数（不传 = 扫 1 遍）。
+//
+//	扫弹窗(名单)        → 扫 1 遍（老行为）
+//	扫弹窗(名单, 3)     → 扫最多 3 遍（点掉一个又冒一个的连锁弹窗用）
+//
 // 返回是否命中过任何一个。
-func 扫弹窗(名单 []string) bool {
+func 扫弹窗(名单 []string, 轮数 ...int) bool {
+	轮 := 1
+	if len(轮数) > 0 && 轮数[0] > 0 {
+		轮 = 轮数[0]
+	}
 	命中 := false
-	for _, 名 := range 名单 {
+	for i := 0; i < 轮; i++ {
 		if 已停止() {
 			return 命中
 		}
-		x, y, ok := 识别(名)
-		if !ok {
-			continue
+		本轮命中 := false
+		for _, 名 := range 名单 {
+			if 已停止() {
+				return 命中
+			}
+			// 挂机中不滑【省电模式】：滑掉它就中断挂机（挂机.go 的 挂机中）
+			if 挂机中 && 名 == "省电模式" {
+				continue
+			}
+			x, y, ok := 识别(名)
+			if !ok {
+				continue
+			}
+			if m, 是滑动 := 滑动表[名]; 是滑动 {
+				core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m[0], m[1], m[2], m[3])
+				core.RandomSwipe(m[0], m[1], m[2], m[3], m[4], m[5], 2500)
+			} else {
+				core.LogWithTimef("[扫弹窗] %s 命中 (%d,%d) → 点击", 名, x, y)
+				core.RandomClickInAreaWithDelay(x, y, x+5, y+5) // 自带延迟
+			}
+			命中 = true
+			本轮命中 = true
 		}
-		if m, 是滑动 := 滑动表[名]; 是滑动 {
-			core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m[0], m[1], m[2], m[3])
-			core.RandomSwipe(m[0], m[1], m[2], m[3], m[4], m[5], 3000)
-		} else {
-			core.LogWithTimef("[扫弹窗] %s 命中 (%d,%d) → 点击", 名, x, y)
-			core.RandomClickInAreaWithDelay(x, y, x+5, y+5) // 自带延迟
+		// 这一轮一个都没命中 → 屏幕干净了，不用再扫
+		if !本轮命中 {
+			break
 		}
-		命中 = true
 	}
 	return 命中
 }
@@ -350,7 +375,7 @@ func 持续找色(名 string, timeout time.Duration, 区域 ...int) bool {
 		if time.Now().After(end) {
 			return false
 		}
-		core.RandomSleep(500, 800)
+		core.RandomSleep(1000, 2000)
 	}
 }
 
@@ -416,4 +441,3 @@ func 识别多个(名 string, 区域 ...int) []坐标 {
 	}
 	return 点
 }
-
