@@ -13,15 +13,15 @@ func init() {
 
 // 地点 一个城市下的地点：名称 + 战力门槛 + 商店类型（可选）
 type 地点 struct {
-	名称     string
+	名称   string
 	战力门槛 int
 	商店类型 string // 商店类型名（可选；空 = 不需要点商店类型）
 }
 
 // 地图配置 通用配置（配置好主城/地点数组）
 type 地图配置 struct {
-	主城名   string // 主城名（recogs/字库预设名）
-	地点列表 []地点 // 该主城下的地点数组
+	主城名  string // 主城名（recogs/字库预设名）
+	地点列表 []地点   // 该主城下的地点数组
 }
 
 // 地图配置表 可配多个城市（用时指定"哪个主城下的哪个地点"）
@@ -99,10 +99,10 @@ var (
 )
 
 const (
-	列表滑动时长   = 2000
-	主城最多找     = 2 // 主城循环最多找几次
+	列表滑动时长  = 2000
+	主城最多找   = 2 // 主城循环最多找几次
 	折叠开最多滑动 = 3 // 折叠开循环里最多滑动次数
-	地点最多滑动   = 6 // 找地点时最多滑动次数（参考野外挂机）
+	地点最多滑动  = 6 // 找地点时最多滑动次数（参考野外挂机）
 )
 
 // 自动买药 插件：检测缺药 → 去主城 → 找地点 → 点商店类型 → 走传送那套。
@@ -171,39 +171,24 @@ func (p *自动买药) Exec(ctx *Context) (string, error) {
 	return "ok", nil
 }
 
-// 买药 到达地点后：循环找【药店npc】(超时30秒/间隔1-2秒) → 点击 → 点【药水】→ 全部 → 确认 → 购买 → 退出
+// 买药 到达地点后：状态驱动 —— 只看屏幕上"现在有什么"，
+// 找【药店npc】(超时30秒) → 进药店后 药水/全部/确认/购买/退出 谁在点谁，点到【退出】即完成。
 func 买药() {
-	// 1) 循环找药店npc（超时 30 秒，间隔 1-2 秒）
-	deadline := time.Now().Add(30 * time.Second)
-	找到 := false
-	for time.Now().Before(deadline) {
-		if IsStopped() {
-			return
-		}
-		if ClickRecog("药店npc") {
-			找到 = true
-			core.RandomSleep(3000, 6000)
-			break
-		}
-		core.RandomSleep(1000, 2000)
-	}
-	if !找到 {
+	// 1) 等【药店npc】出现（超时 30 秒，间隔 1-2 秒）：出现就点，没出现就等下一轮
+	if !CheckLoopClick("药店npc", 30*time.Second, 2*time.Second) {
 		core.LogWithTimef("[买药] 30秒内未找到药店npc → 结束")
 		return
 	}
-	core.RandomSleep(500, 1000)
+	core.RandomSleep(3000, 6000)
 
-	// 2) 点【药水】
-	ClickRecog("药水")
-	core.RandomSleep(500, 1000)
-	// 3) 全部 → 确认 → 购买 → 退出
-	ClickRecog("全部")
-	core.RandomSleep(500, 1000)
-	ClickRecog("确认")
-	core.RandomSleep(500, 1000)
-	ClickRecog("购买")
-	core.RandomSleep(500, 1000)
-	ClickRecog("退出")
+	// 2) 进药店后：药水/全部/确认/购买/退出 任一出现就点它，【退出】命中即完成、不再等超时
+	ClickAdaptive(30000, 2000, nil,
+		btn("药水"),
+		btn("全部"),
+		btn("确认"),
+		btn("购买"),
+		btnStop("退出"),
+	)
 	core.LogWithTimef("[买药] 买药流程结束")
 }
 

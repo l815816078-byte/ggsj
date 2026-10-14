@@ -190,18 +190,17 @@ func btnStop(name string, opts ...any) Btn {
 
 // ClickAdaptive 自适应找按钮（通用）：循环按顺序给出的一组按钮，**按顺序一个一个找、
 // 找到一个就点一个**（从头往后逐个识别，命中就点它，点完继续往后找下一个）；
-// **不管是否还在持续命中，非点击延时时间累计满 timeoutMs 就强制结束**。
+// **从进入函数起累计满 timeoutMs 就强制结束**（识别/等待/点击延时全部计入）。
 // onHit 可选（nil = 不回调）：每点击一个按钮，用**被点按钮的预设名**回调一次。
 //
 // 场景：点某个按钮后，接下来弹出的按钮不固定（例如"点【使用】后可能直接出【打开】，
 // 也可能先出【点击关闭】再出【使用】"），不能写死顺序 —— 用这个函数自适应。
 //
-// 超时是"**硬超时（不含点击延时）**"：从进入函数起计时，识别/等待时间累计满 timeoutMs 就结束；
-// **每次点击自带的"点击后延时"不计入超时预算**（点击后把该次点击耗时补回 deadline）；
+// 超时是"**硬超时**"：从进入函数起计时，识别/等待/点击延时累计满 timeoutMs 就结束；
 // 命中结束按钮不提前返回，只做标记。
 //
 // 参数：
-//   - timeoutMs   硬超时（毫秒）：识别/等待时间累计达到它就结束（点击延时不算）
+//   - timeoutMs   硬超时（毫秒）：识别/等待/点击延时累计达到它就结束
 //   - intervalMs  每轮检测之间的等待（毫秒，取值 [intervalMs/2, intervalMs]）
 //   - onHit       可选回调（传 nil = 不回调）：func(name string)
 //   - btns        按钮项列表（用 btn 构造，**每轮按顺序逐个识别、命中即点**）
@@ -218,7 +217,6 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 	// 是否命中过结束按钮（只做标记，不提前结束）
 	命中结束 := false
 
-	// 超时只看识别/等待时间（点击耗时会在点击后补回 deadline）。
 	for time.Now().Before(deadline) {
 		if IsStopped() {
 			return false
@@ -230,7 +228,7 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 			if IsStopped() {
 				return false
 			}
-			// 到点立即结束（点击延时已不计入 deadline），不等本轮识别完
+			// 到点立即结束，不等本轮识别完
 			if time.Now().After(deadline) {
 				break
 			}
@@ -281,10 +279,7 @@ func ClickAdaptive(timeoutMs, intervalMs int, onHit func(name string), btns ...B
 			clickX := r.X + btns[i].ClickOffset[0]
 			clickY := r.Y + btns[i].ClickOffset[1]
 			core.LogWithTimef("[Plugin] 点击【%s】(%d,%d)", btns[i].Name, clickX, clickY)
-			// 点击自带的"点击后延时"不计入超时预算：测出本次点击耗时，补回 deadline
-			t0 := time.Now()
 			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
-			deadline = deadline.Add(time.Since(t0))
 			if onHit != nil {
 				onHit(btns[i].Name)
 			}

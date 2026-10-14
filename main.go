@@ -1,10 +1,9 @@
 package main
 
 import (
-	"app/bot"
 	"app/core"
+	"app/zt"
 	"fmt"
-	"log"
 
 	"github.com/Dasongzi1366/AutoGo/https"
 )
@@ -137,36 +136,19 @@ func main() {
 	core.SetStatus("已启动，等待任务下发") // 青色状态
 	/*core.RandomSleep(3000, 10000)*/
 
-	// 2. 创建 Bot
-	cfg := bot.DefaultBotConfig()
-	b := bot.NewBot(cfg)
+	// ══════════════════════════════════════════════════════════════════
+	// 【zt 独立框架】——脱离老引擎（bot/scheduler/task/JSON 全部不走）
+	//
+	// 老引擎的启动代码整体停用（保留在下面注释里，随时可回退）：
+	//   cfg := bot.DefaultBotConfig()
+	//   b := bot.NewBot(cfg)
+	//   if err := b.Init(); err != nil { log.Fatalf("初始化失败: %v", err) }
+	//   b.Run()
+	// ══════════════════════════════════════════════════════════════════
 
-	// ================================================================
+	// 跑 zt 主循环（= 老脚本 main.lua 的 _GameFlow，阻塞直到流程结束）
+	// 字库加载在 zt.Run() 内部做（imageHandler 是 cgo 包，避免 main.go 直接依赖）
+	zt.Run()
 
-	// 3. 初始化
-	if err := b.Init(); err != nil {
-		log.Fatalf("初始化失败: %v", err)
-	}
-
-	// 4. 卡密激活/校验：用启动界面输入的卡密（uiCard）做激活
-	//licenseTip := cardkey.CheckAndActivate(core.Config.GetString("license_server"), uiCard)
-	// 5. 启动卡密心跳：维持授权在线窗口；任何心跳错误（拒绝/断网）回调 b.Stop 停止脚本
-	// 换卡/确认卡密由每次启动的启动界面负责（ui.StartUI + cardkey.CheckAndActivate）
-	// 注：bot 本地看门狗心跳（b.Beat / monitor）已停用，bot.Run 里 monitor.Start 已注释
-	//go cardkey.StartHeartbeat(core.Config.GetString("license_server"), licenseTip, cardkey.CardHeartbeatInterval(), func() { b.Stop() })
-
-	// 6. 启动中控通道（WS 上报 + 接收下发配置/命令）
-	// 在 main 里装配，避免 bot/client 互相 import：
-	//   - client 需要 bot 的能力（停止/重启/重置）→ 在这里把 bot 的方法注入 client
-	//   - bot 需要 client 的上报能力 → 把 client.ReportFieldChanged 注入 bot
-	//core.SetReportHook(client.ReportFieldChanged)
-	//bot.SetWSReportHook(client.ReportFieldChanged)
-	//client.SetStopCallback(b.Stop)
-	//client.SetRestartCallback(func() { b.Exception().TriggerFullRestart("中控重启") })
-	//client.SetResetScriptCallback(b.ResetScript)
-	//go client.Start(core.Config.GetString("license_server"), uiCard, cardkey.WindowID(), cardkey.DeviceNo())
-
-	// 7. 运行（阻塞）
-	b.Run()
 	fmt.Println("========== AutoGo 已退出 ==========")
 }
