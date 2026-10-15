@@ -2,7 +2,7 @@ package main
 
 import (
 	"app/core"
-	"app/zt"
+	"app/mian"
 	"fmt"
 
 	"github.com/Dasongzi1366/AutoGo/https"
@@ -144,7 +144,7 @@ func main() {
 	/*core.RandomSleep(3000, 10000)*/
 
 	// ══════════════════════════════════════════════════════════════════
-	// 【zt 独立框架】——脱离老引擎（bot/scheduler/task/JSON 全部不走）
+	// 【mian 独立框架】——脱离老引擎（bot/scheduler/task/JSON 全部不走）
 	//
 	// 老引擎的启动代码整体停用（保留在下面注释里，随时可回退）：
 	//   cfg := bot.DefaultBotConfig()
@@ -153,9 +153,9 @@ func main() {
 	//   b.Run()
 	// ══════════════════════════════════════════════════════════════════
 
-	// 跑 zt 主循环（= 老脚本 main.lua 的 _GameFlow，阻塞直到流程结束）
-	// 字库加载在 zt.Run() 内部做（imageHandler 是 cgo 包，避免 main.go 直接依赖）
-	zt.Run()
+	// 跑 mian 主循环（= 老脚本 main.lua 的 _GameFlow，阻塞直到流程结束）
+	// 字库加载在 mian.Run() 内部做（imageHandler 是 cgo 包，避免 main.go 直接依赖）
+	mian.Run()
 
 	fmt.Println("========== AutoGo 已退出 ==========")
 }

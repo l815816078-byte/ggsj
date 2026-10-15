@@ -1,6 +1,8 @@
-package zt
+package mian
 
 import (
+	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -72,6 +74,235 @@ func 识别(名 string, 区域 ...int) (int, int, bool) {
 		}
 	}
 	return 0, 0, false
+}
+
+// 是否存在 单纯识别一次，只问"在不在"，不关心坐标
+// （= 识别() 的布尔版；不想写 `_, _, x := 识别(...)` 时用它）
+func 是否存在(名 string, 区域 ...int) bool {
+	_, _, ok := 识别(名, 区域...)
+	return ok
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ClickAdaptive —— 从 plugin/wait.go 原样移植
+// ══════════════════════════════════════════════════════════════════════════
+
+// skipTolerance 判断"连续同位置命中"的坐标容差（像素）
+const skipTolerance = 3
+
+// Btn 自适应按钮项：预设名 +（可选）查找区域 / 结束标记 / 稳定命中抑制 / 跳过条件 / 点击偏移 / 命中即停
+type Btn struct {
+	Name string // 识别预设名
+	// [x1,y1,x2,y2]，nil = 用预设自带"截图区域"
+	Region []int
+	// true = 结束按钮：命中就点它并做标记（不提前结束）
+	Done bool
+	// SkipStreak > 0 = 启用"稳定命中抑制"：该按钮连续这么多轮在**完全相同位置**命中，
+	// 则认为它是点不掉的误识别，本次调用内后续所有轮都跳过它。0 = 不启用。
+	SkipStreak int
+	// SkipIfRecog 非空 = 命中本按钮后，若该预设也命中，则**不点**本按钮，本轮继续扫后面的按钮。
+	SkipIfRecog string
+	// ClickOffset 命中后点击"命中坐标 + 偏移"
+	ClickOffset [2]int
+	// Stop = true：命中后**不点击**本按钮，ClickAdaptive **立即返回 true**
+	Stop bool
+	// NeedHit 非空 = 前置状态：本次调用内**点过这里面任意一个按钮**才允许点本按钮。
+	// 给"面板常驻按钮"用（如【关闭】：它一直在，没先干点别的就别去关面板）。
+	// 多个名字是"或"的关系（任一点过即满足）。
+	NeedHit []string
+}
+
+// btn 构造自适应按钮项，可选参数按类型/顺序解析：
+//   - 4 个连续的 int → 识别区域；第 5 个 int → SkipStreak；第 6、7 个 int → ClickOffset
+//   - 只传 1 个 int → SkipStreak（不指定区域）
+//   - bool → true = Done
+//   - string → SkipIfRecog
+//   - []string → NeedHit（前置状态：点过其中任意一个才允许点本按钮）
+func btn(name string, opts ...any) Btn {
+	b := Btn{Name: name}
+	var ints []int
+	for _, o := range opts {
+		switch v := o.(type) {
+		case bool:
+			b.Done = v
+		case int:
+			ints = append(ints, v)
+		case string:
+			b.SkipIfRecog = v
+		case []string:
+			b.NeedHit = v
+		}
+	}
+	if len(ints) >= 4 {
+		b.Region = []int{ints[0], ints[1], ints[2], ints[3]}
+		if len(ints) >= 5 {
+			b.SkipStreak = ints[4]
+		}
+		if len(ints) >= 7 {
+			b.ClickOffset = [2]int{ints[5], ints[6]}
+		}
+	} else if len(ints) == 1 {
+		b.SkipStreak = ints[0]
+	}
+	return b
+}
+
+// btnStop 构造"命中即停"按钮项：命中后**不点击**它，ClickAdaptive **立即返回 true**
+func btnStop(name string, opts ...any) Btn {
+	b := btn(name, opts...)
+	b.Stop = true
+	return b
+}
+
+// btnNeedHit 构造"前置状态"按钮项：本次调用内点过 pre 里任意一个按钮，才允许点本按钮
+//
+//	btnNeedHit("关闭", []string{"使用", "打开", "确认"}, 731, 51, 825, 146, true)
+//	  → 只有先点过【使用】/【打开】/【确认】其中之一，才允许点【关闭】
+func btnNeedHit(name string, pre []string, opts ...any) Btn {
+	b := btn(name, opts...)
+	b.NeedHit = pre
+	return b
+}
+
+// clickStreak 每个按钮"连续同位置命中"的追踪
+type clickStreak struct{ x, y, streak int }
+
+// regionText 按钮本次实际生效的识别区域（日志用）
+// 调用处传了区域就用它；否则用点库预设配的区域（多块用 " | " 分隔）
+func regionText(name string, region []int) string {
+	if len(region) == 4 {
+		return fmt.Sprintf("%d,%d,%d,%d", region[0], region[1], region[2], region[3])
+	}
+	p, ok := 特征表[name]
+	if !ok || len(p.区域) == 0 {
+		return "未配置区域"
+	}
+	var sb strings.Builder
+	for i, 区 := range p.区域 {
+		if i > 0 {
+			sb.WriteString(" | ")
+		}
+		fmt.Fprintf(&sb, "%d,%d,%d,%d", 区[0], 区[1], 区[2], 区[3])
+	}
+	return sb.String()
+}
+
+// ClickAdaptive 按顺序扫描一组按钮：逐个识别，命中就点它，点完继续往后找；
+// 整个列表扫够 scanTimes 遍就结束，每遍之间歇 gapMs 毫秒。
+// 命中 Done 按钮不提前返回，只做标记。
+//
+// 返回：本次是否命中过任一结束按钮（true=命中过；false=没命中/被停止）。
+func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) bool {
+	// 每个按钮"连续同位置命中"的追踪 + 已跳过集合（按按钮下标 i 区分）
+	tr := make(map[int]*clickStreak)
+	skipped := make(map[int]bool)
+
+	hitDone := false
+	hitNames := make(map[string]bool) // 本次调用内已点过的按钮名（NeedHit 的前置状态）
+
+	for scan := 0; scan < scanTimes; scan++ {
+		if 已停止() {
+			return false
+		}
+
+		for i := range btns {
+			if 已停止() {
+				return false
+			}
+			if skipped[i] {
+				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】- 已跳过", 当前任务, scan+1, scanTimes, i, btns[i].Name)
+				continue
+			}
+			x, y, ok := 识别(btns[i].Name, btns[i].Region...)
+			区域文本 := regionText(btns[i].Name, btns[i].Region)
+			if !ok {
+				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】× 未命中 区域(%s)", 当前任务, scan+1, scanTimes, i, btns[i].Name, 区域文本)
+				continue
+			}
+			core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】√ 命中(%d,%d) 区域(%s)", 当前任务, scan+1, scanTimes, i, btns[i].Name, x, y, 区域文本)
+
+			// 前置状态：NeedHit 里指定的按钮本次一个都没点过 → 不点它，本轮继续扫后面的按钮
+			if len(btns[i].NeedHit) > 0 && !hitAnyOf(hitNames, btns[i].NeedHit) {
+				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过",
+					当前任务, scan+1, scanTimes, i, btns[i].Name, btns[i].NeedHit)
+				continue
+			}
+
+			if btns[i].SkipIfRecog != "" && 是否存在(btns[i].SkipIfRecog) {
+				core.LogWithTimef("[自适应]【%s】命中但检测到【%s】→ 跳过该按钮", btns[i].Name, btns[i].SkipIfRecog)
+				continue
+			}
+
+			// 稳定命中抑制：连续 N 轮同位置命中 → 跳过
+			if btns[i].SkipStreak > 0 {
+				t := tr[i]
+				if t == nil {
+					t = &clickStreak{}
+					tr[i] = t
+				}
+				samePos := absInt(t.x-x) <= skipTolerance && absInt(t.y-y) <= skipTolerance
+				if t.streak > 0 && samePos {
+					t.streak++
+				} else {
+					t.x, t.y, t.streak = x, y, 1
+				}
+				if t.streak >= btns[i].SkipStreak {
+					core.LogWithTimef("[自适应]【%s】连续 %d 轮同位置(%d,%d)命中 → 判定点不掉，本次后续跳过",
+						btns[i].Name, t.streak, x, y)
+					skipped[i] = true
+					continue
+				}
+			}
+
+			// 命中即停：不点击本按钮，立即返回 true
+			if btns[i].Stop {
+				core.LogWithTimef("[自适应]命中【%s】(%d,%d) → 命中即停（不点击）", btns[i].Name, x, y)
+				if isDone != nil {
+					isDone(btns[i].Name)
+				}
+				return true
+			}
+
+			// 点击坐标 = 命中坐标 + 点击偏移（默认 [0,0] 即不偏移）
+			clickX := x + btns[i].ClickOffset[0]
+			clickY := y + btns[i].ClickOffset[1]
+			core.LogWithTimef("[自适应]点击【%s】(%d,%d)", btns[i].Name, clickX, clickY)
+			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
+			hitNames[btns[i].Name] = true // 记下"本次已点过"，供 NeedHit 按钮做前置判断
+			if isDone != nil {
+				isDone(btns[i].Name)
+			}
+
+			if btns[i].Done {
+				core.LogWithTimef("[自适应]命中结束按钮【%s】", btns[i].Name)
+				hitDone = true
+			}
+		}
+
+		// 扫两遍之间歇一下（不是最后一遍）
+		if scan < scanTimes-1 && gapMs > 0 {
+			core.RandomSleep(gapMs, gapMs)
+		}
+	}
+	return hitDone
+}
+
+// hitAnyOf 已点过的按钮名里，有没有 pre 指定的任意一个（NeedHit 的前置判断）
+func hitAnyOf(hitNames map[string]bool, pre []string) bool {
+	for _, n := range pre {
+		if hitNames[n] {
+			return true
+		}
+	}
+	return false
+}
+
+// absInt 整数绝对值
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // 区域识别 在给定区域内识别一次（= core.ExecWithConfig 的全部识别类型）
@@ -359,7 +590,7 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 		if !本轮命中 {
 			break
 		}
-		core.RandomSleep(3000, 6000)
+		core.RandomSleep(1000, 2000)
 	}
 	return 命中
 }
@@ -372,7 +603,7 @@ func 持续找色(名 string, timeout time.Duration, 区域 ...int) bool {
 		if 已停止() {
 			return false
 		}
-		if _, _, ok := 识别(名, 区域...); ok {
+		if 是否存在(名, 区域...) {
 			return true
 		}
 		if time.Now().After(end) {
