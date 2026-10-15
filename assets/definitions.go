@@ -17,11 +17,5 @@ var Fonts embed.FS
 //go:embed hashtable.txt
 var HashTable embed.FS
 
-//go:embed 脚本配置.json
-var ScriptConfig embed.FS
-
-//go:embed tasks
-var Tasks embed.FS
-
 //go:embed img
 var Images embed.FS
