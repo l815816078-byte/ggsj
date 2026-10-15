@@ -339,6 +339,7 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 			if 挂机中 && 名 == "省电模式" {
 				continue
 			}
+
 			x, y, ok := 识别(名)
 			if !ok {
 				continue
@@ -352,11 +353,13 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 			}
 			命中 = true
 			本轮命中 = true
+			core.RandomSleep(100, 300) // 每次识别之间歇一下，别连着截图
 		}
 		// 这一轮一个都没命中 → 屏幕干净了，不用再扫
 		if !本轮命中 {
 			break
 		}
+		core.RandomSleep(3000, 6000)
 	}
 	return 命中
 }
