@@ -110,6 +110,11 @@ type Btn struct {
 	// 给"面板常驻按钮"用（如【关闭】：它一直在，没先干点别的就别去关面板）。
 	// 多个名字是"或"的关系（任一点过即满足）。
 	NeedHit []string
+	// ClickTimes > 1 = 命中后**连点这么多下**（同一坐标）；<=0 或 1 = 点一下。
+	// ClickGapMs = 连点之间的间隔范围 **[最小毫秒, 最大毫秒]**，每次在范围内随机取。
+	// 只写 1 个数 = 固定值（最小=最大）；不写/全 0 = 不歇，紧接着点。
+	ClickTimes int
+	ClickGapMs [2]int
 }
 
 // btn 构造自适应按钮项，可选参数按类型/顺序解析：
@@ -164,6 +169,24 @@ func btnNeedHit(name string, pre []string, opts ...any) Btn {
 	return b
 }
 
+// btnMulti 构造"连点"按钮项：命中后在同一坐标连点 times 下，
+// 每一下的点击延时（透传到最后的 RandomClickInAreaWithDelay）都在 gapMin~gapMax 毫秒内随机取值
+// （gapMax 不传 = 固定 gapMin；两值都 0 = 不额外延迟）。
+// 区域走点库预设，不在此内联。
+//
+//	btnMulti("加号", 10, 500, 800)   // 点 10 下，每下延迟 500~800 毫秒（随机）
+//	btnMulti("加号", 5, 1000)        // 点 5 下，每下固定延迟 1 秒
+//	btnMulti("加号", 3, 0)           // 点 3 下，不额外延迟
+func btnMulti(name string, times, gapMin int, gapMax ...int) Btn {
+	b := Btn{Name: name}
+	b.ClickTimes = times
+	b.ClickGapMs = [2]int{gapMin, gapMin}
+	if len(gapMax) > 0 && gapMax[0] > 0 {
+		b.ClickGapMs[1] = gapMax[0]
+	}
+	return b
+}
+
 // clickStreak 每个按钮"连续同位置命中"的追踪
 type clickStreak struct{ x, y, streak int }
 
@@ -214,12 +237,11 @@ func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) 
 				continue
 			}
 			x, y, ok := 识别(btns[i].Name, btns[i].Region...)
-			区域文本 := regionText(btns[i].Name, btns[i].Region)
 			if !ok {
-				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】× 未命中 区域(%s)", 当前任务, scan+1, scanTimes, i, btns[i].Name, 区域文本)
 				continue
 			}
-			core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】√ 命中(%d,%d) 区域(%s)", 当前任务, scan+1, scanTimes, i, btns[i].Name, x, y, 区域文本)
+			core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】√ 命中(%d,%d) 区域(%s)",
+				当前任务, scan+1, scanTimes, i, btns[i].Name, x, y, regionText(btns[i].Name, btns[i].Region))
 
 			// 前置状态：NeedHit 里指定的按钮本次一个都没点过 → 不点它，本轮继续扫后面的按钮
 			if len(btns[i].NeedHit) > 0 && !hitAnyOf(hitNames, btns[i].NeedHit) {
@@ -266,8 +288,23 @@ func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) 
 			// 点击坐标 = 命中坐标 + 点击偏移（默认 [0,0] 即不偏移）
 			clickX := x + btns[i].ClickOffset[0]
 			clickY := y + btns[i].ClickOffset[1]
-			core.LogWithTimef("[自适应]点击【%s】(%d,%d)", btns[i].Name, clickX, clickY)
-			core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
+			连点次数 := btns[i].ClickTimes
+			if 连点次数 <= 0 {
+				连点次数 = 1
+			}
+			for c := 0; c < 连点次数; c++ {
+				if 已停止() {
+					return false
+				}
+				core.LogWithTimef("[自适应]点击【%s】(%d,%d) 第%d/%d下", btns[i].Name, clickX, clickY, c+1, 连点次数)
+				// 连点时把间隔范围 [最小,最大] 透传到点击延时本身（gap 全 0 = 不额外延迟；否则每次随机区间）
+				if btns[i].ClickTimes > 1 {
+					core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5,
+						btns[i].ClickGapMs[0], btns[i].ClickGapMs[1])
+				} else {
+					core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
+				}
+			}
 			hitNames[btns[i].Name] = true // 记下"本次已点过"，供 NeedHit 按钮做前置判断
 			if isDone != nil {
 				isDone(btns[i].Name)
@@ -295,6 +332,57 @@ func hitAnyOf(hitNames map[string]bool, pre []string) bool {
 		}
 	}
 	return false
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 循环检测 —— 从 plugin/wait.go 原样移植（core.Exec → 识别、ClickRecog → 查找点击延时）
+// ══════════════════════════════════════════════════════════════════════════
+
+// CheckLoop 场景循环检测（只检测，不点击）：timeout 内每隔 interval 检测一次，
+// 命中一次立即返回 true，超时返回 false。
+//
+// 可选 region [x1,y1,x2,y2]：传入时覆盖预设区域。
+// 用途：检测"当前是什么场景/在哪一页"（背包列表、药品列表…），
+// 画面切换需要时间，单次检测容易漏，循环检测更稳。
+//
+//	CheckLoop("药品列表", 30*time.Second, 2*time.Second)
+func CheckLoop(name string, timeout, interval time.Duration, region ...int) bool {
+	end := time.Now().Add(timeout)
+	for {
+		if 已停止() {
+			return false
+		}
+		if 是否存在(name, region...) {
+			return true
+		}
+		if time.Now().After(end) {
+			return false
+		}
+		core.RandomSleep(int(interval.Milliseconds()), int(interval.Milliseconds()))
+	}
+}
+
+// CheckLoopClick 场景循环检测（检测到就点）：timeout 内每隔 interval 检测一次，
+// 命中就点它一次并立即返回 true，超时返回 false。
+//
+// 可选 region [x1,y1,x2,y2]：传入时覆盖预设区域。
+// 用途：检测到某场景/按钮就点（药店npc、地图、回退…），复用 查找点击延时。
+//
+//	CheckLoopClick("药店npc", 30*time.Second, 2*time.Second) // 认到就点它
+func CheckLoopClick(name string, timeout, interval time.Duration, region ...int) bool {
+	end := time.Now().Add(timeout)
+	for {
+		if 已停止() {
+			return false
+		}
+		if 查找点击延时(name, region...) {
+			return true
+		}
+		if time.Now().After(end) {
+			return false
+		}
+		core.RandomSleep(int(interval.Milliseconds()), int(interval.Milliseconds()))
+	}
 }
 
 // absInt 整数绝对值

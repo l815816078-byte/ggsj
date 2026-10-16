@@ -1,6 +1,8 @@
 package mian
 
 import (
+	"time"
+
 	"app/core"
 )
 
@@ -147,7 +149,23 @@ func 成长跑() {
 //	每件点开 →（可选：先点【可觉醒】）→ 检测到【确定花钱】→ 点【棕色按钮】(区域 297,619,353,700) → 点【确定花钱】
 //	每件最多 3 次；这件做完 → 下一件
 func 装备处理(标签, 预设名 string, 需可觉醒 bool) {
-	已装备 := 识别多个(预设名)
+	// 循环找【已装备】(超时3秒)，找到就断开（照 plugin/成长.go：界面未就绪时单次识别会漏）
+	var 已装备 = 识别多个(预设名)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if 已停止() {
+			return
+		}
+		已装备 = 识别多个(预设名)
+		if len(已装备) > 0 {
+			core.LogWithTimef("[成长] 【%s】预设【%s】命中 %d 个 → 找到，断开查找", 标签, 预设名, len(已装备))
+			break
+		}
+	}
+	if len(已装备) == 0 {
+		core.LogWithTimef("[成长] 【%s】3秒内未找到【%s】→ 结束", 标签, 预设名)
+		return
+	}
 	core.LogWithTimef("[成长] 【%s】识别到 %d 件", 标签, len(已装备))
 	for _, 点 := range 已装备 {
 		if 已停止() {
@@ -164,17 +182,23 @@ func 装备处理(标签, 预设名 string, 需可觉醒 bool) {
 				core.LogWithTimef("[成长] 【%s】未找到【可觉醒】→ 跳过", 标签)
 			}
 		}
-
+		if 是否存在("已装备选中") {
+			core.LogWithTimef("[成长] 【%s】检测到【已装备选中】→ 放弃当前这件，继续下一个", 标签)
+			break
+		}
 		// 本件最多 3 次：检测到【确定花钱】→ 先点【棕色按钮】，再点【确定花钱】
 		for 次数 := 0; 次数 < 3; 次数++ {
+			// 花钱之前再检测一次【已装备选中】：选中了 = 这件不是目标 → 放弃当前，继续下一件
+
 			x, y, ok := 识别("确定花钱")
 			if !ok {
 				core.LogWithTimef("[成长] 【%s】第%d次未检测到【确定花钱】→ 本件结束", 标签, 次数+1)
 				break
 			}
+
 			core.LogWithTimef("[成长] 【%s】第%d次 检测到【确定花钱】(%d,%d) → 点【棕色按钮】(区域 297,619,353,700)",
 				标签, 次数+1, x, y)
-			查找点击延时("棕色按钮", 297, 619, 353, 700)
+			查找点击延时("棕色按钮", 303, 631, 490, 697)
 			core.RandomClickInAreaWithDelay(x, y, x, y)
 
 			// 需可觉醒时：确定花钱点完后 → 点一下【取消成长选中】
@@ -200,8 +224,14 @@ func 道术强化(标签 string) {
 		core.LogWithTimef("[成长] 【%s】点击红点(%d,%d)", 标签, 点.X, 点.Y)
 		core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+5, 点.Y+5)
 
+		// 花钱之前再检测一次【已装备选中】：选中了 = 这件不是目标 → 放弃当前，继续下一件
+		if 是否存在("已装备选中") {
+			core.LogWithTimef("[成长] 【%s】检测到【已装备选中】→ 放弃当前这件，继续下一个", 标签)
+			break
+		}
 		// 本件最多 3 次：检测到【确定花钱】→ 先点【棕色按钮】，再点【确定花钱】
 		for 次数 := 0; 次数 < 3; 次数++ {
+
 			x, y, ok := 识别("确定花钱")
 			if !ok {
 				core.LogWithTimef("[成长] 【%s】第%d次未检测到【确定花钱】→ 本件结束", 标签, 次数+1)
@@ -209,17 +239,15 @@ func 道术强化(标签 string) {
 			}
 			core.LogWithTimef("[成长] 【%s】第%d次 检测到【确定花钱】(%d,%d) → 点【棕色按钮】(区域 297,619,353,700)",
 				标签, 次数+1, x, y)
-			查找点击延时("棕色按钮", 297, 619, 353, 700)
-			core.RandomClickInAreaWithDelay(x, y, x+5, y+5)
-
-			if 次数 == 2 {
-				// 3 次花完 → 从下往上滑一次
-				m := 滑动表["成长列表"]
-				cx := (1021 + 1082) / 2
-				core.LogWithTimef("[成长] 【%s】从下往上滑动 (%d,%d)→(%d,%d)", 标签, cx, m[1], cx, m[3])
-				core.RandomSwipe(cx, m[1], cx, m[3], m[4])
-			}
+			查找点击延时("棕色按钮", 303, 631, 490, 697)
+			core.RandomClickInAreaWithDelay(x, y, x, y)
 			core.RandomSleep(300, 500)
 		}
+
+		// 每件处理完 → 从下往上滑动一次（照老脚本：每件末尾都滑，不是只在第3次花钱后滑）
+		cx := (1021 + 1082) / 2
+		m := 滑动表["成长列表"]
+		core.LogWithTimef("[成长] 【%s】从下往上滑动 (%d,%d)→(%d,%d)", 标签, cx, m[1], cx, m[3])
+		core.RandomSwipe(cx, m[1], cx, m[3], m[4])
 	}
 }
