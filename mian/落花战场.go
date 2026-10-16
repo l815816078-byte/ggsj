@@ -129,6 +129,7 @@ func 落花战场跑() {
 		}
 		if 查找点击延时("花钱入场") {
 			落花已入场 = true
+			core.RandomSleep(6000, 10000) //进场要很久的
 		}
 		return
 	}
