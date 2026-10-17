@@ -72,10 +72,12 @@ func 每日任务跑() {
 			return
 		}
 		if !每日已滑动 {
-			core.LogWithTimef("[每日任务] 滑动 1027,579 → 990,127")
-			m := 滑动表["开面板"]
-			core.RandomSwipe(m[0], m[1], m[2], m[3], m[4], m[5])
-			每日已滑动 = true
+			if 可滑("开面板") {
+				m := 滑动表["开面板"]
+				core.LogWithTimef("[每日任务] 滑动 %d,%d → %d,%d", m.起点X, m.起点Y, m.终点X, m.终点Y)
+				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
+				每日已滑动 = true
+			}
 			return
 		}
 		if 查找点击延时("任务") {
@@ -110,7 +112,7 @@ func 每日任务跑() {
 			return
 		}
 		// 都没找到 → 滑动列表（从下往上）；滑满换下一个 tab
-		if 每日滑动次数 >= 每日最多滑动 {
+		if 每日滑动次数 >= 滑动次数("每日列表") {
 			core.LogWithTimef("[每日任务]【%s】滑了 %d 次仍没找到 → 下一个类型", 类型, 每日滑动次数)
 			每日下一个类型()
 			return
@@ -120,7 +122,11 @@ func 每日任务跑() {
 		core.LogWithTimef("[每日任务]【%s】第%d次未找到任务 → 滑动 %d,528 → %d,296",
 			类型, 每日滑动次数, cx, cx)
 		m := 滑动表["每日列表"]
-		core.RandomSwipe(cx, m[1], cx, m[3], m[4], m[5])
+		if 可滑("每日列表") {
+			core.LogWithTimef("[每日任务]【%s】第%d次未找到任务 → 滑动 (%d,%d)→(%d,%d)",
+				类型, 每日滑动次数, cx, m.起点Y, cx, m.终点Y)
+			core.RandomSwipe(cx, m.起点Y, cx, m.终点Y, m.时长, m.滑后延时)
+		}
 		return
 	}
 

@@ -41,7 +41,7 @@ func 领取邮件跑() {
 			core.LogWithTimef("[领取邮件] 点红点(%d,%d)", 点.X, 点.Y)
 			core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+5, 点.Y+5)
 			// 自适应点弹窗（= 老脚本 plugin/领取邮件.go 的 ClickAdaptive）
-			ClickAdaptive(3, 500, nil,
+			ClickAdaptive(3, 500, 3, nil,
 				btn("完成对钩", 3), // 连续 3 轮同位置命中（点不掉）→ 后续跳过
 				btn("点击关闭"),
 			)

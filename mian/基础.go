@@ -115,6 +115,9 @@ type Btn struct {
 	// 只写 1 个数 = 固定值（最小=最大）；不写/全 0 = 不歇，紧接着点。
 	ClickTimes int
 	ClickGapMs [2]int
+	// AfterClickMs = **单击后**的额外延时范围 [最小毫秒, 最大毫秒]（透传给 RandomClickInAreaWithDelay）。
+	// 全 0 = 用 core 默认延时（跟普通 btn 一样）。★ 连点（ClickTimes>1）时由 ClickGapMs 承担，本字段不生效。
+	AfterClickMs [2]int
 }
 
 // btn 构造自适应按钮项，可选参数按类型/顺序解析：
@@ -187,6 +190,24 @@ func btnMulti(name string, times, gapMin int, gapMax ...int) Btn {
 	return b
 }
 
+// btnDelay 构造"点击后延时"按钮项：命中点击后额外等 最小~最大 毫秒
+// （透传给 RandomClickInAreaWithDelay 的延时参数 = `查找点击延时(名, 区域..., 延时)` 那第 5 个数；
+// 点击坐标仍走 ClickOffset / 命中坐标，区域等其它可选参数照 btn 的用法往后写）。
+//
+//	maxMs 传 0 = 固定 minMs（最小=最大）
+//
+//	btnDelay("绿色按钮", 3000)               // 点完固定等 3 秒
+//	btnDelay("绿色按钮", 2000, 3000)          // 点完等 2~3 秒
+//	btnDelay("绿色按钮", 3000, 0, 978,583,1054,649) // 点完等 3 秒 + 限定区域
+func btnDelay(name string, minMs, maxMs int, opts ...any) Btn {
+	b := btn(name, opts...)
+	if maxMs <= 0 {
+		maxMs = minMs
+	}
+	b.AfterClickMs = [2]int{minMs, maxMs}
+	return b
+}
+
 // clickStreak 每个按钮"连续同位置命中"的追踪
 type clickStreak struct{ x, y, streak int }
 
@@ -211,11 +232,13 @@ func regionText(name string, region []int) string {
 }
 
 // ClickAdaptive 按顺序扫描一组按钮：逐个识别，命中就点它，点完继续往后找；
-// 整个列表扫够 scanTimes 遍就结束，每遍之间歇 gapMs 毫秒。
+// 最多跑 超时秒 秒（到了就收工）；一轮（= 一次重试）与下一轮之间歇 间隔 毫秒。
+// 某一轮一个都没命中（空转）→ 空转次数+1；连续 重试次数 轮都空转 → 收工
+// （中途任一回合中过 → 空转计数清零，重新数）。
 // 命中 Done 按钮不提前返回，只做标记。
 //
 // 返回：本次是否命中过任一结束按钮（true=命中过；false=没命中/被停止）。
-func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) bool {
+func ClickAdaptive(超时秒, 间隔, 重试次数 int, isDone func(name string), btns ...Btn) bool {
 	// 每个按钮"连续同位置命中"的追踪 + 已跳过集合（按按钮下标 i 区分）
 	tr := make(map[int]*clickStreak)
 	skipped := make(map[int]bool)
@@ -223,30 +246,36 @@ func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) 
 	hitDone := false
 	hitNames := make(map[string]bool) // 本次调用内已点过的按钮名（NeedHit 的前置状态）
 
-	for scan := 0; scan < scanTimes; scan++ {
+	deadline := time.Now().Add(time.Duration(超时秒) * time.Second)
+	scan := 0      // 第几轮（= 第几次重试）
+	空转 := 0        // 连续多少轮一个都没命中
+	for time.Now().Before(deadline) {
 		if 已停止() {
 			return false
 		}
+		scan++
+		中过 := false // 这一轮有没有命中过东西
 
 		for i := range btns {
 			if 已停止() {
 				return false
 			}
 			if skipped[i] {
-				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】- 已跳过", 当前任务, scan+1, scanTimes, i, btns[i].Name)
+				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 已跳过", 当前任务, scan, i, btns[i].Name)
 				continue
 			}
 			x, y, ok := 识别(btns[i].Name, btns[i].Region...)
 			if !ok {
 				continue
 			}
-			core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】√ 命中(%d,%d) 区域(%s)",
-				当前任务, scan+1, scanTimes, i, btns[i].Name, x, y, regionText(btns[i].Name, btns[i].Region))
+			中过 = true
+			core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】√ 命中(%d,%d) 区域(%s)",
+				当前任务, scan, i, btns[i].Name, x, y, regionText(btns[i].Name, btns[i].Region))
 
 			// 前置状态：NeedHit 里指定的按钮本次一个都没点过 → 不点它，本轮继续扫后面的按钮
 			if len(btns[i].NeedHit) > 0 && !hitAnyOf(hitNames, btns[i].NeedHit) {
-				core.LogWithTimef("[自适应][%s] 第%d/%d遍 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过",
-					当前任务, scan+1, scanTimes, i, btns[i].Name, btns[i].NeedHit)
+				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过",
+					当前任务, scan, i, btns[i].Name, btns[i].NeedHit)
 				continue
 			}
 
@@ -301,6 +330,10 @@ func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) 
 				if btns[i].ClickTimes > 1 {
 					core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5,
 						btns[i].ClickGapMs[0], btns[i].ClickGapMs[1])
+				} else if btns[i].AfterClickMs[1] > 0 {
+					// 单击后额外延时（btnDelay 配的 [最小,最大] 毫秒）
+					core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5,
+						btns[i].AfterClickMs[0], btns[i].AfterClickMs[1])
 				} else {
 					core.RandomClickInAreaWithDelay(clickX, clickY, clickX+5, clickY+5)
 				}
@@ -316,12 +349,46 @@ func ClickAdaptive(scanTimes, gapMs int, isDone func(name string), btns ...Btn) 
 			}
 		}
 
-		// 扫两遍之间歇一下（不是最后一遍）
-		if scan < scanTimes-1 && gapMs > 0 {
-			core.RandomSleep(gapMs, gapMs)
+		// 一轮（一次重试）扫完：统计空转，够了就收工；否则歇一下再重试
+		if 中过 {
+			空转 = 0 // 中过东西 → 空转计数清零，重新数
+		} else {
+			空转++
+			core.LogWithTimef("[自适应] 本轮一个都没命中（空转 %d/%d）", 空转, 重试次数)
+			if 空转 >= 重试次数 {
+				core.LogWithTimef("[自适应] 连续 %d 轮空转 → 收工", 空转)
+				return hitDone
+			}
+		}
+		if 间隔 > 0 {
+			core.RandomSleep(间隔, 间隔)
 		}
 	}
 	return hitDone
+}
+
+// 滑动次数 某个滑动最多滑几次（没配/0 = 1 次）
+func 滑动次数(键 string) int {
+	次数 := 滑动表[键].次数
+	if 次数 <= 0 {
+		return 1
+	}
+	return 次数
+}
+
+// 可滑 每次滑动前的前置验证：滑动表里配了 前置验证 的，验证命中才准滑；
+// 没配（空）= 不用验证，直接可滑。
+func 可滑(键 string) bool {
+	前置 := 滑动表[键].前置验证
+	if 前置 == "" {
+		return true
+	}
+	if !是否存在(前置) {
+		core.LogWithTimef("[滑动] %s 前置验证【%s】未命中 → 本次不滑动", 键, 前置)
+		return false
+	}
+	core.LogWithTimef("[滑动] %s 前置验证【%s】命中 → 允许滑动", 键, 前置)
+	return true
 }
 
 // hitAnyOf 已点过的按钮名里，有没有 pre 指定的任意一个（NeedHit 的前置判断）
@@ -682,8 +749,10 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 			}
 
 			if m, 是滑动 := 滑动表[名]; 是滑动 {
-				core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m[0], m[1], m[2], m[3])
-				core.RandomSwipe(m[0], m[1], m[2], m[3], m[4], m[5], 2500)
+				if 可滑(名) {
+					core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m.起点X, m.起点Y, m.终点X, m.终点Y)
+					core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时, 2500)
+				}
 			} else {
 				core.LogWithTimef("[扫弹窗] %s 命中 (%d,%d) → 点击", 名, x, y)
 				core.RandomClickInAreaWithDelay(x, y, x+5, y+5) // 自带延迟

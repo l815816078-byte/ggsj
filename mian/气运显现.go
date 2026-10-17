@@ -56,24 +56,13 @@ func 气运显现跑() {
 			core.LogWithTimef("[气运显现] 点击气运类型【%s】(%d,%d,%d,%d)",
 				类型.名称, 类型.区域[0], 类型.区域[1], 类型.区域[2], 类型.区域[3])
 			core.RandomClickInAreaWithDelay(类型.区域[0], 类型.区域[1], 类型.区域[2], 类型.区域[3])
-			core.RandomSleep(500, 1000)
 		} else {
 			core.LogWithTimef("[气运显现] 气运类型【%s】（默认第一个，无需点击）", 类型.名称)
 		}
 
-		// 当前类型的【气运】一次全部点完（点延时 600ms；点不到 = 这个类型没了的，下一个）
-		for {
-			if 已停止() {
-				return
-			}
-			x, y, ok := 识别("气运")
-			if !ok {
-				core.LogWithTimef("[气运显现] 【%s】没有【气运】了 → 下一个类型", 类型.名称)
-				break
-			}
-			core.LogWithTimef("[气运显现] 点击【气运】(%d,%d)", x, y)
-			core.RandomClickInAreaWithDelay(x, y, x+3, y+3, 500)
-		}
+		// 当前类型的【气运】一次全部点完（自适应循环：点不到 = 这个类型没了的，下一个）
+		ClickAdaptive(60, 700, 3, nil, btnDelay("气运", 500, 1000))
+		core.RandomSleep(1000, 1500)
 	}
 
 	core.LogWithTimef("[气运显现] 类型表已走完 → 点【退出】")

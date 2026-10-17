@@ -41,10 +41,12 @@ func 门派战斗跑() {
 			return
 		}
 		if !门派已滑动 {
-			core.LogWithTimef("[门派战斗] 滑动 1027,579 → 990,127")
-			m := 滑动表["门派面板"]
-			core.RandomSwipe(m[0], m[1], m[2], m[3], m[4], m[5])
-			门派已滑动 = true
+			if 可滑("门派面板") {
+				m := 滑动表["门派面板"]
+				core.LogWithTimef("[门派战斗] 滑动 %d,%d → %d,%d", m.起点X, m.起点Y, m.终点X, m.终点Y)
+				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
+				门派已滑动 = true
+			}
 			return
 		}
 		if 查找点击延时("门派战斗") {

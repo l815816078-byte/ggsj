@@ -66,7 +66,7 @@ func 买药跑() {
 	// 药店里：药水/全部/确认/购买 任一出现就点它；【退出】命中即完成、不再等扫完
 	// （照老脚本 plugin/自动买药.go 的 ClickAdaptive(30000,2000,...)；
 	//   mian 按"扫 N 遍"写：15 遍 × 2 秒间隔 ≈ 30 秒）
-	if ClickAdaptive(2, 500, nil,
+	if ClickAdaptive(2, 500, 2, nil,
 		btn("药水"),
 		btn("全部"),
 		btn("确认"),

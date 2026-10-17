@@ -40,7 +40,7 @@ func 加护跑() {
 	}
 
 	// ① 弹窗按钮（= 老脚本 plugin/加护.go 的 ClickAdaptive）
-	ClickAdaptive(3, 500, nil,
+	ClickAdaptive(60, 500, 3, nil,
 		btn("绿色按钮"),
 		btn("确认"),
 		btn("点击关闭"),
@@ -51,7 +51,7 @@ func 加护跑() {
 	core.RandomClickInAreaWithDelay(184, 78, 280, 105)
 
 	// ③ 召唤阶段：召唤加护 / 跳过 / 绿色按钮 / 棕色按钮；【召唤用光】命中即停（不点击）
-	if ClickAdaptive(3, 500, nil,
+	if ClickAdaptive(60, 500, 3, nil,
 		btnStop("召唤用光"),
 		btn("召唤加护"),
 		btn("跳过"),
