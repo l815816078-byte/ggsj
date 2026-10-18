@@ -101,7 +101,7 @@ func 去地图(城, 地点, 商店类型 string) (success bool) {
 				core.RandomSleep(500, 1000)
 				continue
 			}
-			if 可滑("找主城") {
+			if m.前置验证 == "" || 是否存在(m.前置验证) {
 				core.LogWithTimef("[去地图] 折叠开第%d次未找到【折叠开】→ 滑动 %d,%d → %d,%d", j, m.起点X, m.起点Y, m.终点X, m.终点Y)
 				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
 			}
@@ -135,7 +135,7 @@ func 去地点(地点, 商店类型 string) bool {
 			找到 = true
 			break
 		}
-		if 可滑("找地点") {
+		if m.前置验证 == "" || 是否存在(m.前置验证) {
 			core.LogWithTimef("[去地图] 第%d次未找到地点【%s】→ 滑动 %d,%d → %d,%d", i, 地点, m.起点X, m.起点Y, m.终点X, m.终点Y)
 			core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
 		}

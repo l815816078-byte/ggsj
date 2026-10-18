@@ -474,9 +474,13 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		if 个数 <= 0 {
 			个数 = 1
 		}
+		方向 := p.找色方向
+		if 方向 <= 0 {
+			方向 = 1
+		}
 		for _, raw := range p.多点找色 {
 			first, rest := core.SplitMultiColor(raw)
-			if x, y, ok := core.FindMultiColor(x1, y1, x2, y2, first, rest, 相似度, 个数, 1); ok {
+			if x, y, ok := core.FindMultiColor(x1, y1, x2, y2, first, rest, 相似度, 个数, 方向); ok {
 				return x + p.偏移[0], y + p.偏移[1], true
 			}
 		}
@@ -492,9 +496,13 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		if 个数 <= 0 {
 			个数 = 1
 		}
+		方向 := p.找色方向
+		if 方向 <= 0 {
+			方向 = 1
+		}
 		for _, raw := range p.多点找色Ex {
 			first, rest := core.SplitMultiColor(raw)
-			if x, y, ok := core.FindMultiColorEx(x1, y1, x2, y2, first, rest, 相似度, 个数, 1); ok {
+			if x, y, ok := core.FindMultiColorEx(x1, y1, x2, y2, first, rest, 相似度, 个数, 方向); ok {
 				return x + p.偏移[0], y + p.偏移[1], true
 			}
 		}
@@ -767,12 +775,10 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 				continue
 			}
 
-			if m, 是滑动 := 滑动表[名]; 是滑动 {
-				if 可滑(名) {
-					core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m.起点X, m.起点Y, m.终点X, m.终点Y)
-					core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时, 2500)
-				}
-			} else {
+			if m, 是滑动 := 滑动表[名]; 是滑动 && (m.前置验证 == "" || 是否存在(m.前置验证)) {
+				core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m.起点X, m.起点Y, m.终点X, m.终点Y)
+				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时, 2500)
+			} else if !是滑动 {
 				core.LogWithTimef("[扫弹窗] %s 命中 (%d,%d) → 点击", 名, x, y)
 				core.RandomClickInAreaWithDelay(x, y, x+5, y+5) // 自带延迟
 			}
@@ -835,6 +841,10 @@ func 识别多个(名 string, 区域 ...int) []坐标 {
 		return nil // 单点识别用 识别()；这里只返多个
 	}
 	相似度 := p.相似度
+	方向 := p.找色方向
+	if 方向 <= 0 {
+		方向 = 1
+	}
 	var 点 []坐标
 	for _, 区 := range p.区域 {
 		// 多点找色：全部命中点（相似度默认 0.9，照 区域识别 ①）
@@ -844,7 +854,7 @@ func 识别多个(名 string, 区域 ...int) []坐标 {
 				sim = 0.9
 			}
 			first, rest := core.SplitMultiColor(raw)
-			for _, q := range core.FindMultiColorAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 1) {
+			for _, q := range core.FindMultiColorAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 方向) {
 				点 = append(点, 坐标{q.X + p.偏移[0], q.Y + p.偏移[1]})
 			}
 		}
@@ -855,7 +865,7 @@ func 识别多个(名 string, 区域 ...int) []坐标 {
 				sim = 0.9
 			}
 			first, rest := core.SplitMultiColor(raw)
-			for _, q := range core.FindMultiColorExAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 1) {
+			for _, q := range core.FindMultiColorExAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 方向) {
 				点 = append(点, 坐标{q.X + p.偏移[0], q.Y + p.偏移[1]})
 			}
 		}

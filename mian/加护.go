@@ -34,34 +34,35 @@ func 加护完成() bool { return 加护已完成 }
 func 加护跑() {
 	查找点击延时("主菜单")
 	查找点击延时("加护")
-	if !是否存在("加护列表") {
-		查找点击延时("关闭")
-		return
-	}
+	if 是否存在("加护列表") {
+		// ① 弹窗按钮（= 老脚本 plugin/加护.go 的 ClickAdaptive）
+		ClickAdaptive(60, 500, 3, nil,
+			btn("绿色按钮"),
+			btn("确认"),
+			btn("点击关闭"),
+			btn("自动装备"),
+		)
+		// ② 直接点击区域 184,78,280,105
+		core.LogWithTimef("[加护] 直接点击区域 184,78,280,105")
+		core.RandomClickInAreaWithDelay(184, 78, 280, 105)
 
-	// ① 弹窗按钮（= 老脚本 plugin/加护.go 的 ClickAdaptive）
-	ClickAdaptive(60, 500, 3, nil,
-		btn("绿色按钮"),
-		btn("确认"),
-		btn("点击关闭"),
-		btn("自动装备"),
-	)
-	// ② 直接点击区域 184,78,280,105
-	core.LogWithTimef("[加护] 直接点击区域 184,78,280,105")
-	core.RandomClickInAreaWithDelay(184, 78, 280, 105)
-
-	// ③ 召唤阶段：召唤加护 / 跳过 / 绿色按钮 / 棕色按钮；【召唤用光】命中即停（不点击）
-	if ClickAdaptive(60, 500, 3, nil,
-		btnStop("召唤用光"),
-		btn("召唤加护"),
-		btn("跳过"),
-		btn("绿色按钮"),
-		btn("棕色按钮"),
-	) {
-		core.LogWithTimef("[加护] 命中【召唤用光】→ 召唤次数用光，直接完成")
-		查找点击延时("退出")
+		// ③ 召唤阶段：召唤加护 / 跳过 / 绿色按钮 / 棕色按钮；【召唤用光】命中即停（不点击）
+		if ClickAdaptive(60, 500, 3, nil,
+			btnStop("召唤用光"),
+			btn("召唤加护"),
+			btn("跳过"),
+			btn("绿色按钮"),
+			btn("棕色按钮"),
+		) {
+			core.LogWithTimef("[加护] 命中【召唤用光】→ 召唤次数用光，直接完成")
+			查找点击延时("退出")
+			加护已完成 = true
+			core.LogWithTimef("[加护] ✅ 完成（召唤用光）")
+			return
+		}
+	} else if 是否存在("主菜单列表") {
+		// 菜单开着（主菜单按钮被压住）却开不了加护面板 = 没红点/没这功能
 		加护已完成 = true
-		core.LogWithTimef("[加护] ✅ 完成")
-		return
+		core.LogWithTimef("[加护] ✅ 完成（没红点/没这功能）")
 	}
 }

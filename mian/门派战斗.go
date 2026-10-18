@@ -41,8 +41,8 @@ func 门派战斗跑() {
 			return
 		}
 		if !门派已滑动 {
-			if 可滑("门派面板") {
-				m := 滑动表["门派面板"]
+			m := 滑动表["门派面板"]
+			if m.前置验证 == "" || 是否存在(m.前置验证) {
 				core.LogWithTimef("[门派战斗] 滑动 %d,%d → %d,%d", m.起点X, m.起点Y, m.终点X, m.终点Y)
 				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
 				门派已滑动 = true

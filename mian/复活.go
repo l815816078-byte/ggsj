@@ -40,10 +40,12 @@ func 复活处理() bool {
 	}
 
 	// 先滑掉省电模式（它浮在最上层，会挡住【复活】的识别）
-	if 是否存在("省电模式") && 可滑("省电模式") {
+	if 是否存在("省电模式") {
 		m := 滑动表["省电模式"]
-		core.LogWithTimef("[复活] 检测到【省电模式】→ 滑动 %d,%d → %d,%d", m.起点X, m.起点Y, m.终点X, m.终点Y)
-		core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
+		if m.前置验证 == "" || 是否存在(m.前置验证) {
+			core.LogWithTimef("[复活] 检测到【省电模式】→ 滑动 %d,%d → %d,%d", m.起点X, m.起点Y, m.终点X, m.终点Y)
+			core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时)
+		}
 	}
 
 	n := 复活次数.Add(1)
@@ -51,16 +53,18 @@ func 复活处理() bool {
 
 	if int(n) >= 复活重置阈值 {
 		core.RandomSleep(3000, 3000)
-		// 死前 5 分钟内在打 BOSS → 给"上次打BOSS的那个任务"压 3000 秒冷却
+		// 死前 5 分钟内在打 BOSS → 打BOSS死的，压 6000 秒；否则非打BOSS死的，压 3000 秒
+		冷却 := 3000 * time.Second
 		if time.Since(躲避上次打BOSS时间) < 5*time.Minute {
-			core.LogWithTimef("[复活] 当前任务【%s】立即结束", 当前任务)
-			压任务冷却(躲避上次打BOSS任务名, 3000*time.Second)
-			复活次数.Store(0) // 压了冷却才清零计数，重新累计
-			切下一个任务()   // 死了别再死磕 → 压完冷却立刻换任务（调用方不要再切一次）
+			冷却 = 6000 * time.Second
+			core.LogWithTimef("[复活] 打BOSS死的 → 当前任务【%s】立即结束，压冷却 %d 秒", 当前任务, int(冷却.Seconds()))
 		} else {
-			core.LogWithTimef("[复活] 上次打BOSS任务=【%s】(%.0f秒前) → 超过5分钟，不压冷却",
-				躲避上次打BOSS任务名, time.Since(躲避上次打BOSS时间).Seconds())
+			core.LogWithTimef("[复活] 不是打BOSS死的（上次打BOSS %.0f 秒前）→ 当前任务【%s】立即结束，压冷却 %d 秒",
+				time.Since(躲避上次打BOSS时间).Seconds(), 当前任务, int(冷却.Seconds()))
 		}
+		压任务冷却(躲避上次打BOSS任务名, 冷却)
+		复活次数.Store(0) // 压了冷却才清零计数，重新累计
+		切下一个任务()   // 死了别再死磕 → 压完冷却立刻换任务（调用方不要再切一次）
 	}
 	return true
 }

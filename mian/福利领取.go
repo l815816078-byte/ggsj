@@ -99,7 +99,7 @@ func 天数奖励(deadline time.Time) {
 			core.LogWithTimef("[福利领取] 天数奖励：没有【是否翻页】→ 结束")
 			break
 		}
-		if 可滑("福利天数") {
+		if m.前置验证 == "" || 是否存在(m.前置验证) {
 			if i <= 3 {
 				core.LogWithTimef("[福利领取] 从下往上翻页 %d/3", i)
 				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长)
@@ -138,7 +138,7 @@ func 积分奖励(deadline time.Time) {
 			core.LogWithTimef("[福利领取] 积分奖励：没有【是否下拉】→ 结束")
 			break
 		}
-		if 可滑("福利积分") {
+		if m.前置验证 == "" || 是否存在(m.前置验证) {
 			core.LogWithTimef("[福利领取] 下拉 %d/%d", i, m.次数)
 			core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长)
 		}
