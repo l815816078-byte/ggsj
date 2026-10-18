@@ -460,3 +460,63 @@ func FindMultiColor(x1, y1, x2, y2 int, firstColor, colorMulti string, threshold
 func FindMultiColorAll(x1, y1, x2, y2 int, firstColor, colorMulti string, threshold float64, count, direction int, cacheArgs ...interface{}) []imageHandler.Point {
 	return findMultiColorPoints(x1, y1, x2, y2, firstColor, colorMulti, threshold, count, direction, cacheArgs...)
 }
+
+// ── 以下三个 = 上面"多点找色"的【扩展版】：参数/行为/返回值完全一致，
+//
+//	唯一区别是底层 opencv 方法换成 imageHandler.FindMultiColorEx
+//	（增强型多点找色，支持带绝对坐标的首点写法 "50|674|#RRGGBB-0x101010"）。
+//	点库预设字段：【多点找色Ex】（区别于【多点找色】）。
+func findMultiColorExPoints(x1, y1, x2, y2 int, firstColor, colorMulti string, threshold float64, count, direction int, cacheArgs ...interface{}) []imageHandler.Point {
+
+	// 截取屏幕图片
+	srcMat := captureScreenMat(x1, y1, x2, y2, cacheArgs...)
+	if srcMat == nil || srcMat.Empty() {
+		return nil
+	}
+	defer srcMat.Recycle()
+
+	// 如果 threshold 为 0，使用默认值 0.9
+	if threshold <= 0 {
+		threshold = 0.9
+	}
+
+	// 如果 count 为 0，使用默认值 1
+	if count <= 0 {
+		count = 1
+	}
+
+	// 如果 direction 为 0，使用默认值 1
+	if direction <= 0 {
+		direction = 1
+	}
+
+	// ★ 唯一差异：FindMultiColorEx（其余与 findMultiColorPoints 逐行一致）
+	points := imageHandler.FindMultiColorEx(srcMat, firstColor, colorMulti, threshold, 0, 0, 0, 0, count, direction)
+	if len(points) == 0 {
+		return nil
+	}
+
+	// 所有匹配结果转为绝对坐标
+	result := make([]imageHandler.Point, 0, len(points))
+	for _, p := range points {
+		result = append(result, imageHandler.Point{X: p.X + x1, Y: p.Y + y1})
+	}
+	return result
+}
+
+// FindMultiColorEx 在指定区域内多点找色（扩展版）
+// 参数与返回值同 FindMultiColor，仅底层调用 FindMultiColorEx。
+//
+// 返回值: (x, y, isFind) - 找到返回坐标和true，未找到返回 (-1, -1, false)
+func FindMultiColorEx(x1, y1, x2, y2 int, firstColor, colorMulti string, threshold float64, count, direction int, cacheArgs ...interface{}) (int, int, bool) {
+	points := findMultiColorExPoints(x1, y1, x2, y2, firstColor, colorMulti, threshold, count, direction, cacheArgs...)
+	if len(points) == 0 {
+		return -1, -1, false
+	}
+	return points[0].X, points[0].Y, true
+}
+
+// FindMultiColorExAll 在指定区域内多点找色（扩展版），返回全部匹配点（坐标已转为绝对坐标）
+func FindMultiColorExAll(x1, y1, x2, y2 int, firstColor, colorMulti string, threshold float64, count, direction int, cacheArgs ...interface{}) []imageHandler.Point {
+	return findMultiColorExPoints(x1, y1, x2, y2, firstColor, colorMulti, threshold, count, direction, cacheArgs...)
+}

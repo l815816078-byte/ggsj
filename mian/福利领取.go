@@ -63,12 +63,14 @@ func 福利领取跑() {
 					break
 				}
 				core.LogWithTimef("[福利领取] 内层红点(%d,%d) → 点击", 内点.X, 内点.Y)
-				core.RandomClickInAreaWithDelay(内点.X, 内点.Y, 内点.X+3, 内点.Y+3, 3000)
+				core.RandomClickInAreaWithDelay(内点.X, 内点.Y, 内点.X+3, 内点.Y+3)
+				查找点击延时("点击关闭")
 			}
 
 			// 内层红点点击完之后：走"天数奖励" + "积分奖励"
 			天数奖励(deadline)
 			积分奖励(deadline)
+			core.RandomSleep(1000, 1500)
 		}
 
 		// 外层红点全点完（=0 也成立 → 直接退）→ 点【退出】→ 完成
@@ -114,6 +116,7 @@ func 天数奖励(deadline time.Time) {
 			}
 			core.LogWithTimef("[福利领取] 翻页后红点(%d,%d) → 点击", 点.X, 点.Y)
 			core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+3, 点.Y+3, 3000)
+			查找点击延时("点击关闭")
 		}
 	}
 }
@@ -146,7 +149,8 @@ func 积分奖励(deadline time.Time) {
 				break
 			}
 			core.LogWithTimef("[福利领取] 翻页后红点(%d,%d) → 点击", 点.X, 点.Y)
-			core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+3, 点.Y+3, 3000)
+			core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+3, 点.Y+3)
+			查找点击延时("点击关闭")
 		}
 	}
 }

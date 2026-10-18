@@ -61,11 +61,12 @@ func 气运显现跑() {
 		}
 
 		// 当前类型的【气运】一次全部点完（自适应循环：点不到 = 这个类型没了的，下一个）
-		ClickAdaptive(60, 700, 3, nil, btnDelay("气运", 500, 1000))
+		ClickAdaptive(60, 1000, 3, nil, btnDelay("气运", 500, 1000))
 		core.RandomSleep(1000, 1500)
 	}
 
 	core.LogWithTimef("[气运显现] 类型表已走完 → 点【退出】")
 	查找点击延时("退出")
 	气运已完成 = true
+	core.LogWithTimef("[气运显现] ✅ 完成")
 }

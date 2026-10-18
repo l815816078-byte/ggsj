@@ -268,16 +268,17 @@ func ClickAdaptive(超时秒, 间隔, 重试次数 int, isDone func(name string)
 			if !ok {
 				continue
 			}
-			中过 = true
 			core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】√ 命中(%d,%d) 区域(%s)",
 				当前任务, scan, i, btns[i].Name, x, y, regionText(btns[i].Name, btns[i].Region))
 
 			// 前置状态：NeedHit 里指定的按钮本次一个都没点过 → 不点它，本轮继续扫后面的按钮
+			// ★ 前置未满足【不算命中】：不置 中过（否则常驻按钮会一直刷"命中过"，空转永远清零、拖到超时才收工）
 			if len(btns[i].NeedHit) > 0 && !hitAnyOf(hitNames, btns[i].NeedHit) {
-				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过",
+				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过（不算命中）",
 					当前任务, scan, i, btns[i].Name, btns[i].NeedHit)
 				continue
 			}
+			中过 = true
 
 			if btns[i].SkipIfRecog != "" && 是否存在(btns[i].SkipIfRecog) {
 				core.LogWithTimef("[自适应]【%s】命中但检测到【%s】→ 跳过该按钮", btns[i].Name, btns[i].SkipIfRecog)
@@ -476,6 +477,24 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		for _, raw := range p.多点找色 {
 			first, rest := core.SplitMultiColor(raw)
 			if x, y, ok := core.FindMultiColor(x1, y1, x2, y2, first, rest, 相似度, 个数, 1); ok {
+				return x + p.偏移[0], y + p.偏移[1], true
+			}
+		}
+		return 0, 0, false
+	}
+
+	// ①-2 多点找色Ex（= ①，唯一区别：底层调 core.FindMultiColorEx）
+	if len(p.多点找色Ex) > 0 {
+		if 相似度 <= 0 {
+			相似度 = 0.9
+		}
+		个数 := p.寻找个数
+		if 个数 <= 0 {
+			个数 = 1
+		}
+		for _, raw := range p.多点找色Ex {
+			first, rest := core.SplitMultiColor(raw)
+			if x, y, ok := core.FindMultiColorEx(x1, y1, x2, y2, first, rest, 相似度, 个数, 1); ok {
 				return x + p.偏移[0], y + p.偏移[1], true
 			}
 		}
@@ -826,6 +845,17 @@ func 识别多个(名 string, 区域 ...int) []坐标 {
 			}
 			first, rest := core.SplitMultiColor(raw)
 			for _, q := range core.FindMultiColorAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 1) {
+				点 = append(点, 坐标{q.X + p.偏移[0], q.Y + p.偏移[1]})
+			}
+		}
+		// 多点找色Ex：同上，唯一区别底层调 core.FindMultiColorExAll
+		for _, raw := range p.多点找色Ex {
+			sim := 相似度
+			if sim <= 0 {
+				sim = 0.9
+			}
+			first, rest := core.SplitMultiColor(raw)
+			for _, q := range core.FindMultiColorExAll(区[0], 区[1], 区[2], 区[3], first, rest, sim, 个数, 1) {
 				点 = append(点, 坐标{q.X + p.偏移[0], q.Y + p.偏移[1]})
 			}
 		}

@@ -369,9 +369,13 @@ func 找子任务(名 string) *子任务 {
 	return nil
 }
 
-// 记子任务冷却 跑完（完成/超时）按随机区间记下次可跑时间
+// 记子任务冷却 跑完（完成/超时/卡死）按随机区间记下次可跑时间
 func 记子任务冷却(s *子任务) {
-	子任务下次可跑[s.名] = time.Now().Add(time.Duration(s.冷最小+rand.Intn(s.冷最大-s.冷最小+1)) * time.Second)
+	间隔秒 := s.冷最小 + rand.Intn(s.冷最大-s.冷最小+1)
+	下次 := time.Now().Add(time.Duration(间隔秒) * time.Second)
+	子任务下次可跑[s.名] = 下次
+	core.LogWithTimef("[子任务] 【%s】冷却 %d 秒（区间 %d~%d 随机）→ 下次 %s 可跑",
+		s.名, 间隔秒, s.冷最小, s.冷最大, 下次.Format("15:04:05"))
 }
 
 func init() {

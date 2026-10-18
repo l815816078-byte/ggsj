@@ -135,6 +135,7 @@ func 成长跑() {
 
 		core.LogWithTimef("[成长] 执行【%s-%s】", 类型.名称, 子.名称)
 		子.方法()
+		core.RandomSleep(1500, 2000)
 	}
 
 	core.LogWithTimef("[成长] 类型【%s】子分类已全部处理 → 下一个类型", 类型.名称)
@@ -225,7 +226,7 @@ func 道术强化(标签 string) {
 		core.RandomClickInAreaWithDelay(点.X, 点.Y, 点.X+5, 点.Y+5)
 
 		// 花钱之前再检测一次【已装备选中】：选中了 = 这件不是目标 → 放弃当前，继续下一件
-		if 是否存在("已装备选中") {
+		if !是否存在("已装备选中") {
 			core.LogWithTimef("[成长] 【%s】检测到【已装备选中】→ 放弃当前这件，继续下一个", 标签)
 			break
 		}
