@@ -83,53 +83,6 @@ func 是否存在(名 string, 区域 ...int) bool {
 	return ok
 }
 
-// 识别取文 把区域里的文字读出来返回（读不到返回 ""）。
-// 只支持 取文字库 / 取文 两类 —— 这两类要的是"文字本身"（读数用，如 出售数量/已上架数量），
-// 而 识别() 只回坐标、把文字丢了（区域识别 ⑤⑥ 里的 info 没往外传）。
-// ★ 命中会置 本轮有命中（跟 识别() 一样，参与卡死检测）
-func 识别取文(名 string) string {
-	p, ok := 特征表[名]
-	if !ok {
-		core.LogWithTimef("[识别取文] ★★ 点库里没有【%s】—— 配置缺失，请往 点库.go 的 特征表 补这条预设", 名)
-		return ""
-	}
-	if len(p.区域) == 0 {
-		core.LogWithTimef("[识别取文] ★★ 【%s】没配区域", 名)
-		return ""
-	}
-	for _, 区 := range p.区域 {
-		x1, y1, x2, y2 := 区[0], 区[1], 区[2], 区[3]
-		if p.取文字库 {
-			相似度 := p.相似度
-			if 相似度 <= 0 {
-				相似度 = 0.9
-			}
-			字库 := p.字库名
-			if 字库 == "" {
-				字库 = "library"
-			}
-			_, _, _, info := core.GetWords(x1, y1, x2, y2, p.颜色信息, 相似度, p.颜色信息 != "", 字库)
-			if info != "" {
-				本轮有命中 = true
-				return info
-			}
-			continue
-		}
-		if p.取文 {
-			相似度 := p.相似度
-			if 相似度 <= 0 {
-				相似度 = 0.5
-			}
-			r := core.OcrPaddleText(x1, y1, x2, y2, 相似度, p.颜色信息)
-			if r.Found && r.Word != "" {
-				本轮有命中 = true
-				return r.Word
-			}
-		}
-	}
-	return ""
-}
-
 // ══════════════════════════════════════════════════════════════════════════
 // ClickAdaptive —— 从 plugin/wait.go 原样移植
 // ══════════════════════════════════════════════════════════════════════════
@@ -157,6 +110,10 @@ type Btn struct {
 	// 给"面板常驻按钮"用（如【关闭】：它一直在，没先干点别的就别去关面板）。
 	// 多个名字是"或"的关系（任一点过即满足）。
 	NeedHit []string
+	// NeedRecog 非空 = 前置识别：**这些预设里任意一个正在屏幕上**才允许点本按钮。
+	// 给"面板没开就不能点"的按钮用（如【画册图案列表】没开着 → 红点/确认一个都不许点）。
+	// 多个名字是"或"的关系（任一在屏上即满足）。
+	NeedRecog []string
 	// ClickTimes > 1 = 命中后**连点这么多下**（同一坐标）；<=0 或 1 = 点一下。
 	// ClickGapMs = 连点之间的间隔范围 **[最小毫秒, 最大毫秒]**，每次在范围内随机取。
 	// 只写 1 个数 = 固定值（最小=最大）；不写/全 0 = 不歇，紧接着点。
@@ -216,6 +173,17 @@ func btnStop(name string, opts ...any) Btn {
 func btnNeedHit(name string, pre []string, opts ...any) Btn {
 	b := btn(name, opts...)
 	b.NeedHit = pre
+	return b
+}
+
+// btnNeedRecog 构造"前置识别"按钮项：这些预设里任意一个正在屏幕上，才允许点本按钮
+// （面板/列表没开 → 按钮就算认到也不点，避免在别的界面误点）
+//
+//	btnNeedRecog("返回", []string{"画册图案列表"}, 978, 583, 1054, 649, true)
+//	  → 只有【画册图案列表】在屏上，才允许点【返回】
+func btnNeedRecog(name string, 前置 []string, opts ...any) Btn {
+	b := btn(name, opts...)
+	b.NeedRecog = 前置
 	return b
 }
 
@@ -323,6 +291,13 @@ func ClickAdaptive(超时秒, 间隔, 重试次数 int, isDone func(name string)
 			if len(btns[i].NeedHit) > 0 && !hitAnyOf(hitNames, btns[i].NeedHit) {
 				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 前置未满足（需先点过 %v 之一）→ 跳过（不算命中）",
 					当前任务, scan, i, btns[i].Name, btns[i].NeedHit)
+				continue
+			}
+			// 前置识别：NeedRecog 里指定的预设一个都没命中 → 不点它（面板/列表还没开，按钮认到也不能点）
+			// ★ 同样不算命中（理由同 NeedHit）
+			if len(btns[i].NeedRecog) > 0 && !任一命中(btns[i].NeedRecog) {
+				core.LogWithTimef("[自适应][%s] 第%d次重试 按钮%d【%s】- 前置识别未满足（需 %v 之一在屏上）→ 跳过（不算命中）",
+					当前任务, scan, i, btns[i].Name, btns[i].NeedRecog)
 				continue
 			}
 			中过 = true
@@ -443,6 +418,16 @@ func 可滑(键 string) bool {
 func hitAnyOf(hitNames map[string]bool, pre []string) bool {
 	for _, n := range pre {
 		if hitNames[n] {
+			return true
+		}
+	}
+	return false
+}
+
+// 任一命中 pre 里的预设有没有任意一个正在屏幕上（NeedRecog 的前置判断）
+func 任一命中(pre []string) bool {
+	for _, n := range pre {
+		if 是否存在(n) {
 			return true
 		}
 	}
@@ -786,13 +771,16 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 		轮 = 轮数[0]
 	}
 	命中 := false
+	扫了 := 0 // 实际扫了几轮（提前 break 的会少于 轮）
 	for i := 0; i < 轮; i++ {
 		if 已停止() {
+			core.LogWithTimef("[扫弹窗] 第%d轮被 已停止 打断（命中过=%t）", i+1, 命中)
 			return 命中
 		}
 		本轮命中 := false
 		for _, 名 := range 名单 {
 			if 已停止() {
+				core.LogWithTimef("[扫弹窗] 第%d轮被 已停止 打断", i+1)
 				return 命中
 			}
 			// 挂机中不滑【省电模式】：滑掉它就中断挂机（挂机.go 的 挂机中）
@@ -822,22 +810,29 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 				continue
 			}
 
+			core.LogWithTimef("[扫弹窗] 第%d/%d轮 【%s】命中 (%d,%d)", i+1, 轮, 名, x, y)
 			if m, 是滑动 := 滑动表[名]; 是滑动 && (m.前置验证 == "" || 是否存在(m.前置验证)) {
-				core.LogWithTimef("[扫弹窗] %s 命中 → 滑动 (%d,%d)→(%d,%d)", 名, m.起点X, m.起点Y, m.终点X, m.终点Y)
+				core.LogWithTimef("[扫弹窗]   → 滑动 (%d,%d)→(%d,%d)", m.起点X, m.起点Y, m.终点X, m.终点Y)
 				core.RandomSwipe(m.起点X, m.起点Y, m.终点X, m.终点Y, m.时长, m.滑后延时, 2500)
 			} else if !是滑动 {
-				core.LogWithTimef("[扫弹窗] %s 命中 (%d,%d) → 点击", 名, x, y)
+				core.LogWithTimef("[扫弹窗]   → 点击 (%d,%d)", x, y)
 				core.RandomClickInAreaWithDelay(x, y, x+5, y+5) // 自带延迟
 			}
 			命中 = true
 			本轮命中 = true
 			core.RandomSleep(100, 300) // 每次识别之间歇一下，别连着截图
 		}
+		扫了 = i + 1
 		// 这一轮一个都没命中 → 屏幕干净了，不用再扫
 		if !本轮命中 {
+			core.LogWithTimef("[扫弹窗] 第%d轮无命中 → 屏幕已干净，收工（共扫 %d 轮，命中=%t）", i+1, 扫了, 命中)
 			break
 		}
 		core.RandomSleep(1000, 2000)
+	}
+	// 扫满 轮 数还没干净（弹窗一直冒）→ 也记一下，不静默
+	if 扫了 == 轮 && 命中 {
+		core.LogWithTimef("[扫弹窗] 已扫满 %d 轮仍有命中 → 收工（弹窗可能还在冒）", 轮)
 	}
 	return 命中
 }

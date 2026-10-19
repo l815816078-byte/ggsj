@@ -66,7 +66,8 @@ func 气运显现跑() {
 	}
 
 	core.LogWithTimef("[气运显现] 类型表已走完 → 点【退出】")
-	查找点击延时("退出")
-	气运已完成 = true
-	core.LogWithTimef("[气运显现] ✅ 完成")
+	if 查找点击延时("退出") {
+		气运已完成 = true
+		core.LogWithTimef("[气运显现] ✅ 完成")
+	}
 }

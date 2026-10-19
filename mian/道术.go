@@ -32,9 +32,10 @@ func 道术跑() {
 		// 循环点【确认】（= 老脚本的 ClickAdaptive：60 秒内反复扫，连续 3 轮空转收工）
 		ClickAdaptive(10, 500, 3, nil, btn("确认"))
 		core.LogWithTimef("[道术] → 点【退出】")
-		查找点击延时("退出")
-		道术已完成 = true
-		core.LogWithTimef("[道术] ✅ 完成")
+		if 查找点击延时("退出") {
+			道术已完成 = true
+			core.LogWithTimef("[道术] ✅ 完成")
+		}
 	} else if 是否存在("主菜单列表") {
 		// 菜单开着（主菜单按钮被压住）却开不了道术面板 = 没红点/没这功能
 		道术已完成 = true
