@@ -16,6 +16,23 @@ import (
 // 进商店检测"购买完成"实际判定，命中后全局置位，之后不再检测（见 plugin/检测交易行开启.go）。
 
 func main() {
+	// ==================== 出售数量 / 当前销售金额 / 出售总金额 取文字库测试 ====================
+	// 测完删掉这个块（含 import 的 imageHandler）
+	// ★ 直接调 core.GetWords（= mian 点库 ⑤ 取文字库 分支的底层），参数跟点库三条预设一致
+	/*	{
+		imageHandler.SetDict("ziku.txt", "library")
+		for i := 0; i < 1000000; i++ {
+			_, _, _, w1 := core.GetWords(662, 186, 757, 214, "#D4D4D4-0x2C2C2C", 0.85, true, "library")
+			fmt.Printf("[出售数量测试]     #%02d Word=%q\n", i+1, w1)
+			_, _, _, w2 := core.GetWords(645, 270, 809, 295, "#D4D4D4-0x2C2C2C", 0.85, true, "library")
+			fmt.Printf("[当前销售金额测试] #%02d Word=%q\n", i+1, w2)
+			_, _, _, w3 := core.GetWords(683, 224, 761, 245, "#D4D4D4-0x2C2C2C", 0.85, true, "library")
+			fmt.Printf("[出售总金额测试]   #%02d Word=%q\n", i+1, w3)
+			core.RandomSleep(200, 500)
+		}
+		select {}
+	}*/
+
 	// ==================== 加护口袋 多点找色测试 ====================
 	/*	{
 		imageHandler.SetDict("ziku.txt", "library")
