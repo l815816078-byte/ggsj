@@ -102,7 +102,7 @@ func 解除() bool {
 	// 全部 = tab 切换，找没找到都不影响
 	查找点击延时("全部")
 	查找点击延时("单选框")
-	ClickAdaptive(120, 1000, 3, nil,
+	ClickAdaptive(300, 1500, 3, nil,
 		btn("解除按钮"),
 		btn("绿色按钮"),
 		btn("棕色按钮"),
