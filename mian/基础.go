@@ -43,18 +43,36 @@ func 已停止() bool { return 停止.Load() }
 // 多区域：点库配了多块区域时逐个试，第一个命中就返回（= core.Exec 的多区域逻辑）。
 // 识别类型按字段自动选，顺序同 core.ExecWithConfig：
 //
-//	多点找色 → 模板图片 → 透明图 → 取文 → 取文字库 → 找字 → 颜色数组
+//	多点找色 → 模板图片 → 透明图 → 识别文字分类 → 找字 → 颜色数组
+//
+// ★ 2026-10-21：识别() 和 取文() 是【同一个分发器 执行识别() 的两个出口】——
+//	识别() 拿坐标（判在不在/点击用），取文() 拿文字（读数用）。
+//	原来 找色文字()/取文() 各读一个 bool 字段（取文字库/取文），"省电_金币"配 取文
+//	却被只认 取文字库 的 找色文字() 读 → 恒 false 死判断；现在字段统一成一个
+//	识别文字分类（照 core.Exec 的字段名），七种类型一个分发器全走，不再漏。
 //
 // 本轮有命中 本轮是否有过识别命中（主流程用它做"卡死检测"：连续多轮没命中就重置）
 var 本轮有命中 = false
 
 func 识别(名 string, 区域 ...int) (int, int, bool) {
+	x, y, _, ok := 执行识别(名, 区域...)
+	return x, y, ok
+}
+
+// 执行识别 全项目【唯一】的识别分发器（= core.ExecWithConfig 的 Go 点库版）：
+// 按预设字段自动选类型，一个入口七种类型全走，返回 坐标 + 文字 + 是否命中。
+//
+//	多点找色/多点找色Ex → 模板图片 → 透明图 → 识别文字分类(取文/取文字库) → 找字 → 颜色数组
+//
+// ★ 识别()（拿坐标）和 取文()（拿文字）都是它的出口，别再造第三个读法
+//   （2026-10-21：找色文字/取文 两个各读一个 bool 字段的旧方法已删）
+func 执行识别(名 string, 区域 ...int) (int, int, string, bool) {
 	p, ok := 特征表[名]
 	if !ok {
 		// ★ 这是【配置缺失】不是"没找到"：重试多少次都不可能命中。
 		//   调用方若把它当"没找到"去滑动/重来 → 死循环刷屏（去地图() 已在开头守卫）。
 		core.LogWithTimef("[识别][当前任务:%s] ★★ 点库里没有【%s】—— 配置缺失，请往 点库.go 的 特征表 补这条预设", 当前任务, 名)
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
 	// 区域：调用处传了就覆盖（单区域），否则用点库配的（可能多块）
@@ -67,13 +85,13 @@ func 识别(名 string, 区域 ...int) (int, int, bool) {
 
 	// 多区域：逐个区域识别，第一个命中就返回
 	for _, 区 := range p.区域 {
-		x, y, ok := 区域识别(p, 区[0], 区[1], 区[2], 区[3])
+		x, y, 文字, ok := 区域识别(p, 区[0], 区[1], 区[2], 区[3])
 		if ok {
 			本轮有命中 = true
-			return x, y, true
+			return x, y, 文字, true
 		}
 	}
-	return 0, 0, false
+	return 0, 0, "", false
 }
 
 // 是否存在 单纯识别一次，只问"在不在"，不关心坐标
@@ -494,7 +512,9 @@ func absInt(v int) int {
 }
 
 // 区域识别 在给定区域内识别一次（= core.ExecWithConfig 的全部识别类型）
-func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
+// 区域识别 单块区域的识别分发（= 执行识别() 的里层）：返回 坐标 + 文字 + 是否命中
+// ★ 文字类（取文/取文字库）才有文字，其余类型返回 ""（照 core.Exec：非文字类型 Word 为空）
+func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, string, bool) {
 	相似度 := p.相似度
 
 	// ① 多点找色（无块边界：命中点 + 偏移）
@@ -513,10 +533,10 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		for _, raw := range p.多点找色 {
 			first, rest := core.SplitMultiColor(raw)
 			if x, y, ok := core.FindMultiColor(x1, y1, x2, y2, first, rest, 相似度, 个数, 方向); ok {
-				return x + p.偏移[0], y + p.偏移[1], true
+				return x + p.偏移[0], y + p.偏移[1], "", true
 			}
 		}
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
 	// ①-2 多点找色Ex（= ①，唯一区别：底层调 core.FindMultiColorEx）
@@ -535,10 +555,10 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		for _, raw := range p.多点找色Ex {
 			first, rest := core.SplitMultiColor(raw)
 			if x, y, ok := core.FindMultiColorEx(x1, y1, x2, y2, first, rest, 相似度, 个数, 方向); ok {
-				return x + p.偏移[0], y + p.偏移[1], true
+				return x + p.偏移[0], y + p.偏移[1], "", true
 			}
 		}
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
 	// ② 模板图片（= FindImgFast / FindImgFastAll）
@@ -551,15 +571,15 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 			if p.中坐标 {
 				ms := core.FindImgFastAll(x1, y1, x2, y2, img, p.严格模式, sim, 1)
 				if len(ms) > 0 && ms[0].Sim >= sim {
-					return (ms[0].X + p.偏移[0] + ms[0].X2) / 2, (ms[0].Y + p.偏移[1] + ms[0].Y2) / 2, true
+					return (ms[0].X + p.偏移[0] + ms[0].X2) / 2, (ms[0].Y + p.偏移[1] + ms[0].Y2) / 2, "", true
 				}
 				continue
 			}
 			if x, y, s := core.FindImgFast(x1, y1, x2, y2, img, p.严格模式, sim); s >= sim {
-				return x, y, true
+				return x, y, "", true
 			}
 		}
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
 	// ③ 透明图
@@ -572,28 +592,29 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 			ms := core.FindTranslucentImgAll(x1, y1, x2, y2, img, sim, 1)
 			if len(ms) > 0 {
 				if p.中坐标 {
-					return (ms[0].X + p.偏移[0] + ms[0].X2) / 2, (ms[0].Y + p.偏移[1] + ms[0].Y2) / 2, true
+					return (ms[0].X + p.偏移[0] + ms[0].X2) / 2, (ms[0].Y + p.偏移[1] + ms[0].Y2) / 2, "", true
 				}
-				return ms[0].X, ms[0].Y, true
+				return ms[0].X, ms[0].Y, "", true
 			}
 		}
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
-	// ④ 取文（paddle OCR 读区域文字）
-	if p.取文 {
+	// ④ 识别文字分类（照 core.Exec 的字段名）：
+	//	"取文"     → paddle OCR 把区域文字原样读出来（返回文字）
+	//	"取文字库" → 字库识字把区域文字读出来（返回文字）
+	//	空         → 找字（配 识别文字，见 ⑥）
+	switch p.识别文字分类 {
+	case "取文":
 		if 相似度 <= 0 {
 			相似度 = 0.5
 		}
 		r := core.OcrPaddleText(x1, y1, x2, y2, 相似度, p.颜色信息)
 		if !r.Found {
-			return 0, 0, false
+			return 0, 0, "", false
 		}
-		return r.X, r.Y, true
-	}
-
-	// ⑤ 取文字库（字库识字读文）
-	if p.取文字库 {
+		return r.X, r.Y, r.Word, true
+	case "取文字库":
 		if 相似度 <= 0 {
 			相似度 = 0.9
 		}
@@ -601,14 +622,14 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		if 字库 == "" {
 			字库 = "library"
 		}
-		x, y, _, _ := core.GetWords(x1, y1, x2, y2, p.颜色信息, 相似度, p.颜色信息 != "", 字库)
+		x, y, _, 文字 := core.GetWords(x1, y1, x2, y2, p.颜色信息, 相似度, p.颜色信息 != "", 字库)
 		if x < 0 || y < 0 {
-			return 0, 0, false
+			return 0, 0, "", false
 		}
-		return x, y, true
+		return x, y, 文字, true
 	}
 
-	// ⑥ 找字（识别文字）
+	// ⑤ 找字（识别文字分类 空时）
 	if p.识别文字 != "" {
 		if 相似度 <= 0 {
 			相似度 = 0.85
@@ -620,19 +641,19 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		if p.中坐标 {
 			ms := core.FindStrAll(x1, y1, x2, y2, p.识别文字, 相似度, 字库, 1)
 			if len(ms) == 0 {
-				return 0, 0, false
+				return 0, 0, "", false
 			}
 			m := ms[0]
-			return (m.Left + p.偏移[0] + m.Right) / 2, (m.Top + p.偏移[1] + m.Bottom) / 2, true
+			return (m.Left + p.偏移[0] + m.Right) / 2, (m.Top + p.偏移[1] + m.Bottom) / 2, p.识别文字, true
 		}
 		x, y, _, _ := core.FindStr(x1, y1, x2, y2, p.识别文字, 相似度, 字库)
 		if x <= 0 || y <= 0 {
-			return 0, 0, false
+			return 0, 0, "", false
 		}
-		return x + p.偏移[0], y + p.偏移[1], true
+		return x + p.偏移[0], y + p.偏移[1], p.识别文字, true
 	}
 
-	// ⑦ 颜色数组（单色比色）
+	// ⑥ 颜色数组（单色比色）
 	if len(p.颜色数组) > 0 {
 		if 相似度 <= 0 {
 			相似度 = 0.9
@@ -647,63 +668,22 @@ func 区域识别(p 预设, x1, y1, x2, y2 int) (int, int, bool) {
 		}
 		for _, clr := range p.颜色数组 {
 			if x, y, ok := core.FindColor(x1, y1, x2, y2, clr, 相似度, 个数, 方向); ok {
-				return x, y, true
+				return x, y, "", true
 			}
 		}
-		return 0, 0, false
+		return 0, 0, "", false
 	}
 
-	return 0, 0, false
+	return 0, 0, "", false
 }
 
-// 找色文字 取文字库读出的文字（药品数量这类"读数"用）
-func 找色文字(名 string, 区域 ...int) (string, bool) {
-	p, ok := 特征表[名]
-	if !ok || !p.取文字库 {
-		return "", false
-	}
-	if len(区域) == 4 {
-		p.区域 = [][4]int{{区域[0], 区域[1], 区域[2], 区域[3]}}
-	}
-	if len(p.区域) == 0 {
-		p.区域 = [][4]int{{0, 0, 0, 0}}
-	}
-	相似度 := p.相似度
-	if 相似度 <= 0 {
-		相似度 = 0.9
-	}
-	字库 := p.字库名
-	if 字库 == "" {
-		字库 = "library"
-	}
-	区 := p.区域[0]
-	_, _, _, info := core.GetWords(区[0], 区[1], 区[2], 区[3], p.颜色信息, 相似度, p.颜色信息 != "", 字库)
-	return info, info != ""
-}
-
-// 取文 paddle OCR 读区域里的文字（"战斗力"这类取文型读数用）
-// 返回读到的文字；读不到返回 "" , false
+// 取文 读预设的文字（"药品数量/战斗力/省电_金币"这类"读数"用）
+// = 执行识别() 的文字出口：不管预设配的是"取文"（paddle）还是"取文字库"（字库识字）都读
+// ★ 2026-10-21：旧的 找色文字()（只认 取文字库 字段）已删 —— "省电_金币"配的是取文，
+//   被只认 取文字库 的 找色文字() 读 → 恒 false 死判断。现在一个入口按 识别文字分类 分发
 func 取文(名 string, 区域 ...int) (string, bool) {
-	p, ok := 特征表[名]
-	if !ok {
-		return "", false
-	}
-	if len(区域) == 4 {
-		p.区域 = [][4]int{{区域[0], 区域[1], 区域[2], 区域[3]}}
-	}
-	if len(p.区域) == 0 {
-		return "", false
-	}
-	相似度 := p.相似度
-	if 相似度 <= 0 {
-		相似度 = 0.5
-	}
-	区 := p.区域[0]
-	r := core.OcrPaddleText(区[0], 区[1], 区[2], 区[3], 相似度, p.颜色信息)
-	if !r.Found {
-		return "", false
-	}
-	return r.Word, true
+	_, _, 文字, ok := 执行识别(名, 区域...)
+	return 文字, ok
 }
 
 // 查找点击延时：查找（识别）→ 命中就点（点击自带延时）。
