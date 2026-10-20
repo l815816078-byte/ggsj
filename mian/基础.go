@@ -810,6 +810,16 @@ func 扫弹窗(名单 []string, 轮数 ...int) bool {
 				continue
 			}
 
+			// ★ 场景加载中特例：认到【不点击】，等 6 秒让它加载完（转圈圈时点了会打断加载）
+			//   ★ 算命中：这轮确实"有活干"（在等），卡死检测别清零
+			if 名 == "场景加载中" {
+				core.LogWithTimef("[扫弹窗] 第%d/%d轮 【%s】命中 → 不点击，等 6 秒", i+1, 轮, 名)
+				core.RandomSleep(6000, 6000)
+				本轮命中 = true
+				命中 = true
+				continue
+			}
+
 			core.LogWithTimef("[扫弹窗] 第%d/%d轮 【%s】命中 (%d,%d)", i+1, 轮, 名, x, y)
 			if m, 是滑动 := 滑动表[名]; 是滑动 && (m.前置验证 == "" || 是否存在(m.前置验证)) {
 				core.LogWithTimef("[扫弹窗]   → 滑动 (%d,%d)→(%d,%d)", m.起点X, m.起点Y, m.终点X, m.终点Y)
